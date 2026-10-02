@@ -1,0 +1,12 @@
+prefix : <https://test.com/d/>
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+construct {
+    ?id_iri a :Person ;
+        :name ?name ~?stmt_iri .
+    ?stmt_iri :source ?src_iri .
+}
+where {
+    BIND(tarql:expandPrefixedName(?id) AS ?id_iri)
+    BIND(tarql:expandPrefixedName(?source) AS ?src_iri)
+    BIND(tarql:expandPrefixedName(?stmt) AS ?stmt_iri)
+}

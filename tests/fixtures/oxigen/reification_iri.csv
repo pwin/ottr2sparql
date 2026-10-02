@@ -1,0 +1,3 @@
+id,name,source,stmt
+:alice,Alice,:wiki,:stmt_alice
+:bob,Bob,:census,:stmt_bob

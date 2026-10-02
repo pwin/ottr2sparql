@@ -1,0 +1,12 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix : <https://test.com/d/> .
+
+:alice a :Person ;
+	:name "Alice" .
+_:r1 rdf:reifies <<( :alice :name "Alice" )>> ;
+	:source :wiki .
+
+:bob a :Person ;
+	:name "Bob" .
+_:r2 rdf:reifies <<( :bob :name "Bob" )>> ;
+	:source :census .

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ottr-tarql"
+version = "0.1.0"
+description = "Bi-directional conversion between TARQL/oxi-gen SPARQL CONSTRUCT mappings and OTTR templates"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["rdflib>=7"]
+
+[project.urls]
+Repository = "https://github.com/pwin/ottr2sparql"
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+ottr-tarql = "ottr_tarql.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
