@@ -43,13 +43,16 @@ def test_parse_construct_forms():
     assert set(q2.triples) == set(q.triples) and q2.where == q.where and q2.tail == q.tail
 
 
-@pytest.mark.parametrize(
-    "construct",
-    ["?s :p ?o ~ _:r .", "?s :p ?o {| :src ?x |} .", "<< ?s :p ?o >> :src ?x .", "?s :p (1 2) ."],
-)
-def test_unsupported_construct(construct):
-    with pytest.raises(Unsupported):
+@pytest.mark.parametrize("construct", ["?s :p ?o ~ _:r .", "?s :p ?o {| :src ?x |} .", "<< ?s :p ?o >> :src ?x ."])
+def test_rdf12_syntax_is_rejected(construct):
+    """The project works with RDF 1.1 and SPARQL 1.1; RDF 1.2 input is refused with a clear message."""
+    with pytest.raises(Unsupported, match="RDF 1.1"):
         parse_query(f"PREFIX : <http://ex/> CONSTRUCT {{ {construct} }} WHERE {{}}")
+
+
+def test_collections_in_construct_are_rejected():
+    with pytest.raises(Unsupported):
+        parse_query("PREFIX : <http://ex/> CONSTRUCT { ?s :p (1 2) . } WHERE {}")
 
 
 def test_stottr_roundtrip():
