@@ -141,7 +141,7 @@ the difference:
 |---|---|
 | `none` or a constant passed in the template | resolved statically |
 | default value `?x = d` with a variable argument | `BIND(COALESCE(?x, d) AS ?x_dN)`. A blank-node default becomes `BNODE()`. |
-| mandatory parameter `?m`, triple that doesn't mention `?m` | the predicate is replaced by `?_gN`, with `BIND(IF(BOUND(?m), pred, ?_unbound) AS ?_gN)` |
+| mandatory parameter `?m`, triple that doesn't mention `?m` | the predicate is replaced by `?_gN`, with `BIND(IF(sameTerm(?m, ?m), pred, ?_unbound) AS ?_gN)`. `sameTerm` is used rather than `BOUND`, because oxi-gen substitutes CSV values into the query, and after that `BOUND(?column)` is always false. |
 | `cross` / `zipMin` / `zipMax` over constant lists | unrolled at compose time |
 
 The guard rule follows from OTTR: an instance with `none` for a mandatory parameter is removed
@@ -167,8 +167,8 @@ instances, which is an independent check that both forms produce the same RDF.
 ## 4. How correctness is checked
 
 `tests/test_roundtrip.py` checks these equivalences up to graph isomorphism, on every fixture and
-its CSV (the oxi-gen test fixtures plus extra ones covering blank nodes, shared shapes, every
-literal form, predicate variables and FILTERs):
+its CSV (the oxi-gen test fixtures, plus extra ones covering blank nodes, shared shapes, every
+literal form, predicate variables, FILTERs and oxi-gen's `BOUND` behaviour):
 
 1. `run(q) ≅ run(compose(decompose(q)))`: the TARQL → OTTR → TARQL round trip.
 2. `run(q) ≅ Lutra(instances(decompose(q), csv))`: the decomposed templates mean what the query
@@ -177,17 +177,63 @@ literal form, predicate variables and FILTERs):
    parameters, nested blank nodes, `cross` and list objects.
 4. Lutra `lint` reports no warnings or errors on the generated library.
 
-`run` is an rdflib emulation of oxi-gen: one solution per row through `VALUES`, blank or whitespace
-cells unbound, `?ROWNUM`, and `tarql:expandPrefix`/`expandPrefixedName`.
+`tests/test_oxigen.py` runs the same queries through the real oxi-gen binary when `OXI_GEN` points
+to one. It checks that the emulation and every composed query agree with oxi-gen.
+`tests/test_shapes.py` checks that the generated shapes (§5) accept the output for every fixture and
+reject deliberately broken data. It uses SHACL_Engine (`pip install shacl`).
 
-## 5. Limitations and extension points
+`run` is an rdflib emulation of oxi-gen. It reproduces oxi-gen's behaviour in these respects:
+
+* one solution per row (supplied through `VALUES`);
+* blank or whitespace cells are unbound;
+* `\` escapes the next character inside quoted CSV fields;
+* `?ROWNUM` counts from 0;
+* `tarql:expandPrefix` and `tarql:expandPrefixedName` are available;
+* `BOUND(?column)` is always false, because oxi-gen substitutes CSV values into the query.
+
+## 5. SHACL shapes from templates (`shapes`)
+
+`ottr-tarql shapes` turns templates into SHACL shapes describing the RDF the templates produce, so
+output from oxi-gen, Lutra or any other source can be checked. For example, use SHACL_Engine
+(`pip install shacl`) or `holos validate`. Each root template is expanded the same way `compose`
+expands it. That gives every triple pattern, the variables each pattern needs, and the declared
+type of every variable.
+
+| In the templates | In the shapes |
+|---|---|
+| a subject with a constant `rdf:type C` | a shape with `sh:targetClass C` (classes with identical constraints share one shape) |
+| a blank node built by a template and pointed to by another triple | `sh:node`, to a nested shape |
+| any other subject | `sh:targetSubjectsOf p`, where `p` is the predicate it most reliably has |
+| literal type `xsd:T` | `sh:datatype xsd:T`. With `--allow-subtypes`, any rOTTR subtype is also accepted, as OTTR's type checker would. |
+| `ottr:IRI`, `owl:Class`, … | `sh:nodeKind sh:BlankNodeOrIRI`, or `sh:IRI` if the parameter is non-blank (`!`) |
+| a constant object | `sh:in`, plus `sh:hasValue` if the triple is always present |
+| an object whose own type triple always comes with it | `sh:class` |
+| `List<T>` | each member checked through the path `( [ sh:zeroOrMorePath rdf:rest ] rdf:first )` |
+| a triple always emitted with the node | `sh:minCount 1` |
+| `--max-counts` | `sh:maxCount`, assuming one instance per node |
+
+Two rules keep the shapes from rejecting valid output:
+
+* **`sh:minCount`.** A triple is "always emitted with the node" when its variables are a subset of
+  the variables of the triple that makes the node a focus node (its type triple or the linking
+  triple), allowing for variables that are always bound, such as those with defaults. This must
+  hold in **every** template that can produce such nodes.
+  * By default, the roots made by `decompose` are used if there are any, and otherwise every
+    template in the library.
+  * `-T` limits this to the templates you actually instantiate, which gives tighter shapes.
+* **Values.** The values allowed for a predicate are the union over every pattern with that
+  predicate in every root, because one node can receive triples from several templates.
+  `rdf:type` is not restricted, since other sources and inference often add types. Only
+  guaranteed extra classes become `sh:hasValue`.
+
+## 6. Limitations and extension points
 
 | Not supported | Why / possible extension |
 |---|---|
 | RDF 1.2 reifiers `~`, annotations `{| |}`, triple terms `<< >>` (oxi-gen supports them) | OTTR has no triple terms. A future option could lower `s p o ~r` to `r rdf:reifies <<( s p o )>>` once OTTR gains triple terms, or to classic `rdf:Statement` reification. These queries are skipped with a message. |
 | RDF collections `( … )` in a CONSTRUCT template | could map to OTTR list constants, since compose already emits lists as collections |
 | list-typed parameters fed from data | A TARQL row has one value per column. The natural mapping is oxi-gen's `--split COL ITEM DELIM`: `cross \| T(++?col)` ↔ `--split col col_item ";"` with `?col_item` in the template. That flag lives on the command line, not in the query, so it is left for a future version. |
-| `!` (non-blank) and type checks at run time | they become declarations only. The SPARQL does not enforce them. |
+| `!` (non-blank) and type checks at run time | They become declarations only, and the SPARQL does not enforce them. Check the output with the shapes from §5 instead. |
 | generalising constants | Shapes that differ only in a constant (`a :Item` vs `a :Product`) stay separate. Anti-unification could lift such constants to parameters. |
 | common sub-shapes | Factoring reuses only shapes that already exist as whole groups. It does not mine shared sub-patterns. |
 | bOTTR | The `tq:` annotations play the role of a bOTTR source mapping. Exporting them as bOTTR (H2 SQL over CSV) is possible, but would need SPARQL expressions translated to SQL. |

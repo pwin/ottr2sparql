@@ -12,6 +12,7 @@ from ottr_tarql.runner import normalize
 ROOT = Path(__file__).resolve().parent.parent
 FIX = Path(__file__).resolve().parent / "fixtures"
 LUTRA = ROOT / "tools" / "lutra.jar"
+EXAMPLE = ROOT / "examples" / "oxigen"
 
 # TARQL fixtures with the CSV used to exercise them
 CASES = {
@@ -24,6 +25,7 @@ CASES = {
     "extra/people.rq": ("extra/people.csv", True),
     "extra/orgs.rq": ("extra/orgs.csv", True),
     "extra/constants.rq": ("extra/constants.csv", True),
+    "extra/bound.rq": ("extra/bound.csv", True),
 }
 
 

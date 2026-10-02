@@ -13,7 +13,7 @@ import pytest
 import rdflib
 from rdflib.compare import isomorphic, to_isomorphic, graph_diff
 
-from conftest import CASES, FIX, lutra_expand, needs_lutra
+from conftest import CASES, EXAMPLE, FIX, lutra_expand, needs_lutra
 from ottr_tarql import Library, compose, decompose, parse_query, parse_stottr
 from ottr_tarql.cli import load_library
 from ottr_tarql.runner import expand, generate_instances, read_csv, run_query
@@ -124,3 +124,27 @@ def test_composed_matches_lutra(products):
     lib, rows, _, g = products
     insts = generate_instances(lib, "t:Product", rows)
     assert_same(g, lutra_expand(PRODUCTS.parent, lib.prefixes, insts))
+
+
+# ---------------------------------------------------------------------------- docs/OXIGEN-INTEGRATION.md example
+
+
+@pytest.fixture(scope="module")
+def person():
+    lib = Library([parse_stottr((EXAMPLE / "people.stottr").read_text(encoding="utf8"))])
+    rows = read_csv((EXAMPLE / "people.csv").read_text(encoding="utf8"))
+    return lib, rows, compose(lib, "ex:Person").query
+
+
+def test_example_query_is_checked_in(person):
+    from ottr_tarql import serialize_query
+
+    _, _, query = person
+    assert (EXAMPLE / "person.rq").read_text(encoding="utf8") == serialize_query(query)
+
+
+@needs_lutra
+def test_example_person_matches_lutra(person):
+    lib, rows, query = person
+    insts = generate_instances(lib, "ex:Person", rows)
+    assert_same(lutra_expand(EXAMPLE, lib.prefixes, insts), run_query(query, rows))

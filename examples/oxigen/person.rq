@@ -1,0 +1,28 @@
+# Generated from OTTR template <http://example.com/ns#Person>.
+# CSV columns: person, name, email, manager
+PREFIX ex: <http://example.com/ns#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX schema: <https://schema.org/>
+
+CONSTRUCT {
+  ?person_iri
+      ?_g1 schema:Person ;
+      schema:name ?name ;
+      ?_g2 ?email ;
+      ?_g4 ?manager_iri ;
+      ?_g5 _:b3 .
+  _:b3
+      ?_g6 ?manager_iri ;
+      ?_g7 "hr.csv" .
+}
+WHERE {
+  BIND(IF(CONTAINS(STR(?person), "://"), IRI(?person), tarql:expandPrefixedName(?person)) AS ?person_iri)
+  BIND(IF(CONTAINS(STR(?manager), "://"), IRI(?manager), tarql:expandPrefixedName(?manager)) AS ?manager_iri)
+  BIND(IF(sameTerm(?name, ?name), rdf:type, ?_unbound) AS ?_g1)
+  BIND(IF(sameTerm(?name, ?name), schema:email, ?_unbound) AS ?_g2)
+  BIND(IF(sameTerm(?name, ?name), ex:reportsTo, ?_unbound) AS ?_g4)
+  BIND(IF(sameTerm(?manager_iri, ?manager_iri) && sameTerm(?name, ?name), ex:reporting, ?_unbound) AS ?_g5)
+  BIND(IF(sameTerm(?name, ?name) && sameTerm(?person_iri, ?person_iri), ex:manager, ?_unbound) AS ?_g6)
+  BIND(IF(sameTerm(?manager_iri, ?manager_iri) && sameTerm(?name, ?name) && sameTerm(?person_iri, ?person_iri), ex:source, ?_unbound) AS ?_g7)
+}

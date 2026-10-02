@@ -10,8 +10,8 @@
 
 from __future__ import annotations
 
-import csv
-import io
+import re
+
 from dataclasses import replace
 
 import rdflib
@@ -20,7 +20,7 @@ from rdflib.plugins.sparql.sparql import SPARQLError
 
 from .compose import _Expander, compose
 from .ottr import Instance, Library
-from .sparql import Raw, TarqlQuery, serialize_query
+from .sparql import Bind, Raw, TarqlQuery, serialize_query
 from .terms import IRI, NONE, XSD, BNode, ListTerm, Literal, escape_string
 
 TARQL_NAMESPACES = ("https://semanticarts.com/tarql/", "http://tarql.github.io/tarql#")
@@ -52,9 +52,58 @@ for _ns in TARQL_NAMESPACES:
 # ---------------------------------------------------------------------------- CSV
 
 
-def read_csv(text: str, delimiter: str = ",", header: bool = True) -> list[dict[str, str]]:
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    rows = [r for r in reader if r]
+def parse_csv(text: str, delimiter: str = ",", quote: str = '"', escape: str = "\\") -> list[list[str]]:
+    """Split CSV text the way the Rust ``csv`` crate does with oxi-gen's defaults:
+    inside a quoted field ``escape`` takes the next character literally and a
+    doubled quote is a quote; CR, LF and CRLF end a record; blank lines are skipped."""
+    rows: list[list[str]] = []
+    row: list[str] = []
+    field: list[str] = []
+    in_quotes, at_start = False, True
+    started = False  # has the current record consumed anything?
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if in_quotes:
+            if escape and c == escape and i + 1 < n:
+                field.append(text[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                if i + 1 < n and text[i + 1] == quote:
+                    field.append(quote)
+                    i += 2
+                    continue
+                in_quotes = False
+            else:
+                field.append(c)
+            i += 1
+            continue
+        if c in "\r\n":
+            if started:
+                row.append("".join(field))
+                rows.append(row)
+            row, field, started, at_start = [], [], False, True
+            i += 2 if c == "\r" and i + 1 < n and text[i + 1] == "\n" else 1
+            continue
+        started = True
+        if c == delimiter:
+            row.append("".join(field))
+            field, at_start = [], True
+        elif c == quote and at_start:
+            in_quotes, at_start = True, False
+        else:
+            field.append(c)
+            at_start = False
+        i += 1
+    if started:
+        row.append("".join(field))
+        rows.append(row)
+    return rows
+
+
+def read_csv(text: str, delimiter: str = ",", header: bool = True, quote: str = '"', escape: str = "\\") -> list[dict[str, str]]:
+    rows = parse_csv(text, delimiter, quote, escape)
     if not rows:
         return []
     if header:
@@ -72,7 +121,7 @@ def _values_clause(query: TarqlQuery, rows: list[dict[str, str]]) -> str:
     with_rownum = "?ROWNUM" in text
     head = " ".join(f"?{c}" for c in cols) + (" ?ROWNUM" if with_rownum else "")
     lines = []
-    for n, r in enumerate(rows, 1):
+    for n, r in enumerate(rows):  # oxi-gen numbers rows from 0
         vals = [escape_string(r[c]) if r.get(c, "").strip() else "UNDEF" for c in cols]
         if with_rownum:
             vals.append(str(n))
@@ -82,11 +131,29 @@ def _values_clause(query: TarqlQuery, rows: list[dict[str, str]]) -> str:
     return f"VALUES ({head}) {{\n" + "\n".join("  " + ln for ln in lines) + "\n}"
 
 
+def _mimic_substitution(where: list, columns: set[str]) -> list:
+    """oxi-gen substitutes CSV values into the query instead of binding them, and
+    BOUND() of a substituted variable is then always false. VALUES would make it
+    true, so rewrite BOUND(?column) to false to give oxi-gen's answer."""
+    if not columns:
+        return list(where)
+    rx = re.compile(r"\bBOUND\s*\(\s*[?$](" + "|".join(map(re.escape, sorted(columns))) + r")\s*\)", re.I)
+    out = []
+    for c in where:
+        if isinstance(c, Bind):
+            out.append(Bind(c.var, rx.sub("false", c.expr)))
+        else:
+            out.append(Raw(rx.sub("false", c.text)))
+    return out
+
+
 def _with_rows(query: TarqlQuery, rows: list[dict[str, str]]) -> TarqlQuery:
     pm = query.prefixes.copy()
     if "tarql" not in pm.map:
         pm.add("tarql", TARQL_NAMESPACES[0])
-    return replace(query, prefixes=pm, where=[Raw(_values_clause(query, rows))] + list(query.where), dataset="", header="")
+    columns = {c for r in rows for c in r} | {"ROWNUM"}
+    where = [Raw(_values_clause(query, rows))] + _mimic_substitution(query.where, columns)
+    return replace(query, prefixes=pm, where=where, dataset="", header="")
 
 
 def run_query(query: TarqlQuery, rows: list[dict[str, str]]) -> rdflib.Graph:
