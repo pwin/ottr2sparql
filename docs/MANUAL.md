@@ -6,7 +6,8 @@
   runs once for each row of a CSV.
 * **OTTR templates** (`.stottr`): small, named, reusable patterns ([ottr.xyz](https://ottr.xyz)).
 
-It can also make **SHACL shapes** from templates, to check the RDF you produce.
+It can also make **SHACL shapes** from templates, to check the RDF you produce. It works with
+RDF 1.1 and SPARQL 1.1.
 
 ## Install
 
@@ -140,7 +141,7 @@ generate_shapes(lib, ["ex:Person"]).serialize("shapes.ttl", format="turtle")
 
 * **Lists.** A list value, such as `skills` holding `python;rust`, can't become a query yet. Use
   Lutra with the bOTTR mapping in `examples/oxigen/employees.bottr.ttl`.
-* **RDF 1.2.** Queries that use RDF 1.2 statements about statements (`~`, `{| |}`, `<< >>`) are
-  skipped by `decompose`.
+* **RDF 1.1 only.** The tool works with RDF 1.1 and SPARQL 1.1. Queries that use RDF 1.2 syntax
+  (`~`, `{| |}`, `<< >>`) are rejected with a message.
 * **More detail.** See [README](../README.md), [DESIGN.md](DESIGN.md) and
   [OXIGEN-INTEGRATION.md](OXIGEN-INTEGRATION.md).

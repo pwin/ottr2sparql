@@ -152,7 +152,7 @@ def _parse_pol(s: Stream, ctx: _Ctx, subj, out: list) -> None:
         while True:
             obj = _parse_term(s, ctx, out)
             if s.at("PUNCT", "~") or s.at("PUNCT", "{|"):
-                raise Unsupported("RDF 1.2 reifiers / annotations ('~', '{| |}') have no OTTR counterpart")
+                raise Unsupported("RDF 1.2 syntax ('~' reifiers, '{| |}' annotations) is not supported: this tool works with RDF 1.1 and SPARQL 1.1")
             out.append((subj, pred, obj))
             if s.at("PUNCT", ","):
                 s.next()
@@ -192,7 +192,7 @@ def _parse_term(s: Stream, ctx: _Ctx, out: list):
     if t.kind == "PUNCT" and t.value == "(":
         raise Unsupported("RDF collections in CONSTRUCT templates are not supported")
     if t.kind == "PUNCT" and t.value == "<<":
-        raise Unsupported("RDF-star triple terms ('<< >>') have no OTTR counterpart")
+        raise Unsupported("RDF 1.2 triple terms ('<< >>') are not supported: this tool works with RDF 1.1 and SPARQL 1.1")
     raise SyntaxErr(f"unexpected token {t.value!r} in CONSTRUCT template")
 
 

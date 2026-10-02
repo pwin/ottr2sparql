@@ -1,8 +1,8 @@
 # ottr-tarql
 
 Converts in both directions between **TARQL / oxi-gen SPARQL CONSTRUCT** mappings and **OTTR templates** (stOTTR),
-and generates **SHACL shapes** from templates to check the RDF they produce. New here? Read the short
-[manual](docs/MANUAL.md).
+and generates **SHACL shapes** from templates to check the RDF they produce. It works with **RDF 1.1 and
+SPARQL 1.1**. New here? Read the short [manual](docs/MANUAL.md).
 
 * `decompose`: takes a *set* of `.rq` files and produces a shared library of reusable OTTR templates, plus one
   root template per query. Shapes that are identical across files are merged, and larger shapes are rewritten to

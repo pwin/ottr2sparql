@@ -10,6 +10,9 @@ This tool converts in both directions between two ways of describing how tabular
   syntax, the [Lutra](https://gitlab.com/ottr/lutra/lutra) reference implementation). These are
   named, parameterised, nestable patterns that expand down to the base template `ottr:Triple`.
 
+**Scope: RDF 1.1 and SPARQL 1.1.** OTTR, Lutra and rdflib all work at that level. Input that uses
+RDF 1.2 syntax is rejected (see §6).
+
 ```
                  decompose                                  compose
  *.rq  ───────────────────────────►  templates.stottr   ───────────────►  *.rq
@@ -230,7 +233,7 @@ Two rules keep the shapes from rejecting valid output:
 
 | Not supported | Why / possible extension |
 |---|---|
-| RDF 1.2 reifiers `~`, annotations `{| |}`, triple terms `<< >>` (oxi-gen supports them) | OTTR has no triple terms. A future option could lower `s p o ~r` to `r rdf:reifies <<( s p o )>>` once OTTR gains triple terms, or to classic `rdf:Statement` reification. These queries are skipped with a message. |
+| RDF 1.2 syntax: reifiers `~`, annotations `{| |}`, triple terms `<< >>` | Out of scope. The project works with RDF 1.1 and SPARQL 1.1, which OTTR, Lutra and rdflib all support. Queries using RDF 1.2 syntax are rejected with a message, even though oxi-gen can run them. |
 | RDF collections `( … )` in a CONSTRUCT template | could map to OTTR list constants, since compose already emits lists as collections |
 | list-typed parameters fed from data | A TARQL row has one value per column. The natural mapping is oxi-gen's `--split COL ITEM DELIM`: `cross \| T(++?col)` ↔ `--split col col_item ";"` with `?col_item` in the template. That flag lives on the command line, not in the query, so it is left for a future version. |
 | `!` (non-blank) and type checks at run time | They become declarations only, and the SPARQL does not enforce them. Check the output with the shapes from §5 instead. |
