@@ -10,7 +10,10 @@ the WHERE clause:
 * mandatory parameter ->  an instance is dropped when a mandatory argument is
   unbound. Triples of that instance that do not mention the variable are
   guarded: their predicate is replaced by ``?_gN`` bound with
-  ``IF(BOUND(?arg), pred, ?_unbound)``.
+  ``IF(sameTerm(?arg, ?arg), pred, ?_unbound)``. (Not ``BOUND(?arg)``: oxi-gen
+  binds CSV columns by substituting them into the query, after which ``BOUND``
+  of a column is always false. ``sameTerm(?v, ?v)`` is true exactly when ``?v``
+  has a value, and errors - so the guard fails - when it has none.)
 * list expanders      ->  unrolled at compose time (lists must be constants).
 
 If the root template carries ``tq:`` annotations (made by ``decompose``) they
@@ -30,6 +33,19 @@ from .sparql import Bind, Raw, TarqlQuery, Unsupported
 from .terms import IRI, NONE, OTTR, OTTR_TRIPLE, RDF, TQ, XSD, BNode, ListTerm, Literal, PrefixMap, Var, local_name, render_term
 
 
+@dataclass(frozen=True)
+class Pattern:
+    """A triple the expansion can emit, emitted exactly when every variable in
+    ``cond`` is bound (the triple's own variables plus the mandatory arguments of
+    the instances it came from)."""
+
+    s: object
+    p: object
+    o: object
+    cond: frozenset
+    repeated: bool  # inside a list expansion over a parameter: one copy per element
+
+
 @dataclass
 class ComposeResult:
     query: TarqlQuery
@@ -40,13 +56,21 @@ class ComposeResult:
 class _Expander:
     """Symbolic expansion of template instances into (s, p, o) patterns."""
 
-    def __init__(self, lib: Library, prefixes: PrefixMap, max_depth: int = 64):
+    def __init__(self, lib: Library, prefixes: PrefixMap, max_depth: int = 64, symbolic_lists: bool = False):
         self.lib, self.pm, self.max_depth = lib, prefixes, max_depth
+        # symbolic_lists: expand `cross | T(++?list)` once, with a stand-in variable
+        # for "any element" (for shapes; a query needs the elements themselves)
+        self.symbolic_lists = symbolic_lists
         self.triples: list[tuple] = []
         self._seen: set[tuple] = set()
+        self.patterns: list[Pattern] = []
+        self._pattern_seen: set[Pattern] = set()
+        self.var_types: dict[str, list] = {}  # declared types of every parameter a variable was passed to
+        self.var_nonblank: set[str] = set()
         self.binds: list[Bind] = []
         self.always_bound: set[str] = set()
         self._guards: dict = {}
+        self._repeat = 0
         self._n = itertools.count(1)
 
     # -- instances --------------------------------------------------------------
@@ -54,8 +78,15 @@ class _Expander:
         if depth > self.max_depth:
             raise Unsupported(f"template nesting deeper than {self.max_depth} (cyclic templates?)")
         args = [self._subst(a, subst) for a in inst.args]
-        for arglist in self._expand_lists(inst, args):
-            self.apply(inst.template, arglist, required, depth)
+        for arglist, elements in self._expand_lists(inst, args):
+            if not elements:
+                self.apply(inst.template, arglist, required, depth)
+                continue
+            self._repeat += 1
+            try:
+                self.apply(inst.template, arglist, required | elements, depth)
+            finally:
+                self._repeat -= 1
 
     def apply(self, iri: str, args: list, required: frozenset, depth: int) -> None:
         t = self.lib.get(iri)
@@ -82,6 +113,10 @@ class _Expander:
                 elif not p.optional:
                     req.add(a.name)
             sub[p.name] = a
+            if isinstance(a, Var):
+                self.var_types.setdefault(a.name, []).append(p.type)
+                if p.nonblank:
+                    self.var_nonblank.add(a.name)
         for inner in t.body or []:
             self.instance(inner, sub, frozenset(req), depth + 1)
 
@@ -92,6 +127,10 @@ class _Expander:
             if isinstance(t, ListTerm):
                 raise Unsupported("a list cannot be the subject or predicate of a triple")
         present = {t.name for t in (s, p, o) if isinstance(t, Var)}
+        pattern = Pattern(s, p, o, frozenset(present) | required, self._repeat > 0)
+        if pattern not in self._pattern_seen:
+            self._pattern_seen.add(pattern)
+            self.patterns.append(pattern)
         missing = required - present
         if missing:
             p = self._guard(p, frozenset(missing))
@@ -130,22 +169,32 @@ class _Expander:
                 walk(p.default)
         return {("bnode", lb): BNode(f"b{next(self._n)}") for lb in sorted(labels)}
 
-    def _expand_lists(self, inst: Instance, args: list) -> list[list]:
+    def _expand_lists(self, inst: Instance, args: list) -> list[tuple[list, frozenset]]:
+        """Argument lists to apply the template to, each with the stand-in element
+        variables it depends on (only in symbolic mode)."""
         if not inst.expander:
-            return [args]
-        lists = {}
+            return [(args, frozenset())]
+        lists, elements = {}, set()
         for i, (a, f) in enumerate(zip(args, inst.expand_flags)):
             if not f:
                 continue
             if a is NONE:
                 return []
-            if not isinstance(a, ListTerm):
+            if isinstance(a, ListTerm):
+                lists[i] = list(a.items)
+            elif self.symbolic_lists and isinstance(a, Var):
+                element = Var(f"{a.name}_item{next(self._n)}")
+                list_type = next((t for t in self.var_types.get(a.name, []) if isinstance(t, ListType)), None)
+                self.var_types[element.name] = [list_type.inner if list_type else None]
+                lists[i] = [element]
+                elements.add(element.name)
+            else:
                 raise Unsupported(
                     "a list expander over a parameter needs list values per row, which TARQL rows do not have; "
                     "only constant lists can be expanded (see docs/DESIGN.md, 'Lists')"
                 )
-            lists[i] = list(a.items)
-        if inst.expander == "cross":
+        if inst.expander == "cross" or elements:
+            # a stand-in element pairs with every position, so zips over-approximate as cross
             combos = itertools.product(*lists.values())
         elif inst.expander == "zipMin":
             combos = zip(*lists.values())
@@ -156,7 +205,7 @@ class _Expander:
             new = list(args)
             for i, v in zip(lists.keys(), combo):
                 new[i] = v
-            out.append(new)
+            out.append((new, frozenset(elements)))
         return out
 
     def _coalesce(self, v: Var, default) -> Var:
@@ -172,7 +221,7 @@ class _Expander:
         key = (p, missing)
         if key not in self._guards:
             gv = f"_g{next(self._n)}"
-            cond = " && ".join(f"BOUND(?{m})" for m in sorted(missing))
+            cond = " && ".join(f"sameTerm(?{m}, ?{m})" for m in sorted(missing))
             self.binds.append(Bind(gv, f"IF({cond}, {render_term(p, self.pm)}, ?_unbound)"))
             self._guards[key] = Var(gv)
         return self._guards[key]

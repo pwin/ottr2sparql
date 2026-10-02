@@ -1,4 +1,4 @@
-"""Command line: ottr-tarql {decompose,compose,instances,run,expand}."""
+"""Command line: ottr-tarql {decompose,compose,shapes,instances,run,expand}."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from .compose import compose, roots_in
 from .decompose import decompose
 from .ottr import Library, parse_stottr, render_document
 from .runner import expand, generate_instances, read_csv, run_query
+from .shapes import DEFAULT_SHAPES_NS, generate_shapes
 from .sparql import Unsupported, parse_query, serialize_query
 
 
@@ -36,7 +37,7 @@ def _out(text: str, path: str | None) -> None:
 def _rows(args) -> list[dict]:
     text = Path(args.input).read_text(encoding="utf-8-sig") if args.input else sys.stdin.read()
     delim = "\t" if args.tab else args.delimiter
-    return read_csv(text, delim, header=not args.no_header_row)
+    return read_csv(text, delim, header=not args.no_header_row, quote=args.quote_char, escape=args.escape_char)
 
 
 def _csv_opts(p: argparse.ArgumentParser) -> None:
@@ -44,6 +45,8 @@ def _csv_opts(p: argparse.ArgumentParser) -> None:
     p.add_argument("-d", "--delimiter", default=",")
     p.add_argument("-t", "--tab", action="store_true", help="tab separated input")
     p.add_argument("-H", "--no-header-row", action="store_true", help="columns are named a-z, A-Z")
+    p.add_argument("-p", "--escape-char", default="\\", help="escape character inside quoted fields (default: backslash)")
+    p.add_argument("--quote-char", default='"')
 
 
 def cmd_decompose(a) -> int:
@@ -81,6 +84,13 @@ def cmd_compose(a) -> int:
             print(out)
         else:
             _out(text, a.output)
+    return 0
+
+
+def cmd_shapes(a) -> int:
+    lib = load_library(a.library)
+    g = generate_shapes(lib, a.template, a.shapes_ns, max_counts=a.max_counts, allow_subtypes=a.allow_subtypes)
+    _out(g.serialize(format="turtle"), a.output)
     return 0
 
 
@@ -135,6 +145,21 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-o", "--output", help="output file (directory with --all)")
     p.add_argument("--no-infer-binds", action="store_true", help="do not convert typed parameters from CSV strings")
     p.set_defaults(fn=cmd_compose)
+
+    p = sub.add_parser("shapes", help="OTTR templates -> SHACL shapes for the RDF they produce")
+    p.add_argument("library", nargs="+", help="stOTTR files or directories")
+    p.add_argument(
+        "-T", "--template", action="append",
+        help="root template (repeatable); default: the roots made by decompose, else every template",
+    )
+    p.add_argument("-o", "--output")
+    p.add_argument("--shapes-ns", default=DEFAULT_SHAPES_NS, help="namespace for the shape IRIs")
+    p.add_argument("--max-counts", action="store_true", help="add sh:maxCount, assuming one instance builds each node")
+    p.add_argument(
+        "--allow-subtypes", action="store_true",
+        help="accept datatype subtypes as OTTR does (e.g. xsd:int where xsd:integer is declared)",
+    )
+    p.set_defaults(fn=cmd_shapes)
 
     p = sub.add_parser("instances", help="CSV rows -> stOTTR instances of a template (for Lutra)")
     p.add_argument("library", nargs="+")

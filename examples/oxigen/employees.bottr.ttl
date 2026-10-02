@@ -1,0 +1,25 @@
+@prefix ex:   <http://example.com/ns#> .
+@prefix ottr: <http://ns.ottr.xyz/0.4/> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Standard bOTTR, runnable with Lutra today: SQL (H2) does the lifting,
+# argument maps give types and turn "a;b;c" into an OTTR list.
+[] a ottr:InstanceMap ;
+  ottr:template ex:Employee ;
+  ottr:source [ a ottr:H2Source ] ;
+  ottr:query """
+    SELECT REPLACE(person, 'ex:', 'http://example.com/ns#'),
+           name,
+           NULLIF(email, ''),
+           REPLACE(NULLIF(manager, ''), 'ex:', 'http://example.com/ns#'),
+           '(' || NULLIF(skills, '') || ')'
+    FROM CSVREAD('@@THIS_DIR@@/people.csv')
+  """ ;
+  ottr:argumentMaps (
+    [ ottr:type ottr:IRI ]
+    [ ottr:type xsd:string ]
+    [ ottr:type xsd:string ]
+    [ ottr:type ottr:IRI ]
+    [ ottr:type ( rdf:List xsd:string ) ; ottr:listSep ";" ]
+  ) .
