@@ -1,7 +1,8 @@
 """Execution helpers built on rdflib.
 
 * :func:`run_query` - evaluate a TARQL query over CSV rows the way oxi-gen does
-  (one solution per row, empty cells unbound, ``?ROWNUM``, ``tarql:`` functions).
+  (one solution per row, empty cells unbound, ``?ROWNUM``, ``tarql:`` functions,
+  oxi-gen's strict casts and its forms of typed literals; see :mod:`.literals`).
 * :func:`generate_instances` - turn CSV rows into stOTTR instances of a root
   template, by evaluating the WHERE clause of the composed query.
 * :func:`expand` - expand OTTR instances to triples (a convenience; Lutra is the
@@ -11,17 +12,19 @@
 from __future__ import annotations
 
 import re
-
+from contextlib import contextmanager
 from dataclasses import replace
 
 import rdflib
+from rdflib.plugins.sparql import operators
 from rdflib.plugins.sparql.operators import register_custom_function
 from rdflib.plugins.sparql.sparql import SPARQLError
 
 from .compose import _Expander, compose
+from .literals import CANONICAL, canonical_lexical
 from .ottr import Instance, Library
 from .sparql import Bind, Raw, TarqlQuery, serialize_query
-from .terms import IRI, NONE, XSD, BNode, ListTerm, Literal, escape_string
+from .terms import IRI, NONE, XSD, BNode, ListTerm, Literal, Var, escape_string
 
 TARQL_NAMESPACES = ("https://semanticarts.com/tarql/", "http://tarql.github.io/tarql#")
 _prefixes: dict[str, str] = {}
@@ -47,6 +50,47 @@ def _expand_prefix(prefix):
 for _ns in TARQL_NAMESPACES:
     register_custom_function(rdflib.URIRef(_ns + "expandPrefixedName"), _expand_prefixed_name, override=True)
     register_custom_function(rdflib.URIRef(_ns + "expandPrefix"), _expand_prefix, override=True)
+
+
+def _strict_cast(e, ctx):
+    """A SPARQL 1.1 cast from a string accepts only the XSD lexical form, as in
+    oxi-gen; rdflib would also take, for example, a date for xsd:dateTime."""
+    x = e.expr[0] if e.expr and len(e.expr) == 1 else None
+    if isinstance(x, rdflib.Literal) and x.language is None and x.datatype in (None, rdflib.XSD.string):
+        lexical = canonical_lexical(str(e.iri), str(x))
+        if lexical is None:
+            raise SPARQLError(f"cannot cast {str(x)!r} to <{e.iri}>")
+        return rdflib.Literal(lexical, datatype=e.iri, normalize=False)
+    return operators.default_cast(e, ctx)
+
+
+@contextmanager
+def _oxigen_semantics():
+    """Evaluate with oxi-gen's casts, and keep lexical forms as written (rdflib would
+    otherwise rewrite "...Z" as "...+00:00" when it builds a literal)."""
+    saved_normalize = rdflib.NORMALIZE_LITERALS
+    saved_casts = {iri: operators._CUSTOM_FUNCTIONS.get(rdflib.URIRef(iri)) for iri in CANONICAL}
+    rdflib.NORMALIZE_LITERALS = False
+    for iri in CANONICAL:
+        operators._CUSTOM_FUNCTIONS[rdflib.URIRef(iri)] = (_strict_cast, True)
+    try:
+        yield
+    finally:
+        rdflib.NORMALIZE_LITERALS = saved_normalize
+        for iri, pair in saved_casts.items():
+            if pair is None:
+                operators._CUSTOM_FUNCTIONS.pop(rdflib.URIRef(iri), None)
+            else:
+                operators._CUSTOM_FUNCTIONS[rdflib.URIRef(iri)] = pair
+
+
+def _oxigen_form(term):
+    """oxi-gen writes each typed value an expression produces in canonical form."""
+    if isinstance(term, rdflib.Literal) and term.datatype is not None:
+        lexical = canonical_lexical(str(term.datatype), str(term))
+        if lexical is not None and lexical != str(term):
+            return rdflib.Literal(lexical, datatype=term.datatype, normalize=False)
+    return term
 
 
 # ---------------------------------------------------------------------------- CSV
@@ -157,21 +201,37 @@ def _with_rows(query: TarqlQuery, rows: list[dict[str, str]]) -> TarqlQuery:
 
 
 def run_query(query: TarqlQuery, rows: list[dict[str, str]]) -> rdflib.Graph:
-    """Evaluate a TARQL CONSTRUCT over CSV rows (oxi-gen semantics)."""
-    q = _with_rows(query, rows)
-    _prefixes.clear()
-    _prefixes.update(q.prefixes.map)
-    res = rdflib.Graph().query(serialize_query(q))
-    return normalize(res.graph)
+    """Evaluate a TARQL CONSTRUCT over CSV rows (oxi-gen semantics).
+
+    The template is filled in from the solutions here rather than by rdflib, so that
+    constants keep the form they are written in, while values from the WHERE clause
+    take oxi-gen's form."""
+    g = rdflib.Graph()
+    for solution in select_rows(query, rows):
+        bound = {str(k): v for k, v in solution.items()}
+        fresh: dict[str, rdflib.BNode] = {}  # template blank nodes are new for every solution
+        for triple in query.triples:
+            s, p, o = (
+                bound.get(t.name) if isinstance(t, Var)
+                else fresh.setdefault(t.label, rdflib.BNode()) if isinstance(t, BNode)
+                else to_rdflib(t)
+                for t in triple
+            )
+            if s is None or o is None or isinstance(s, rdflib.Literal) or not isinstance(p, rdflib.URIRef):
+                continue
+            g.add((s, p, o))
+    return normalize(g)
 
 
 def select_rows(query: TarqlQuery, rows: list[dict[str, str]]) -> list[dict]:
+    """The WHERE clause's solutions, one per row, with oxi-gen's forms of typed values."""
     q = _with_rows(query, rows)
     _prefixes.clear()
     _prefixes.update(q.prefixes.map)
     text = serialize_query(q)
     text = text[: text.index("CONSTRUCT")] + "SELECT *" + text[text.index("\nWHERE {") :]
-    return [dict(b) for b in rdflib.Graph().query(text).bindings]
+    with _oxigen_semantics():
+        return [{k: _oxigen_form(v) for k, v in b.items()} for b in rdflib.Graph().query(text).bindings]
 
 
 # ---------------------------------------------------------------------------- OTTR instances
@@ -195,7 +255,8 @@ def to_rdflib(t):
     if isinstance(t, Literal):
         if t.lang:
             return rdflib.Literal(t.lexical, lang=t.lang)
-        return rdflib.Literal(t.lexical, datatype=rdflib.URIRef(t.datatype) if t.datatype else None)
+        # keep the lexical form: rdflib would rewrite "...Z" as "...+00:00", "1" as "true"
+        return rdflib.Literal(t.lexical, datatype=rdflib.URIRef(t.datatype) if t.datatype else None, normalize=False)
     raise TypeError(t)
 
 

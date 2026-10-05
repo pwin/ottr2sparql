@@ -196,7 +196,18 @@ reject deliberately broken data. It uses SHACL_Engine (`pip install shacl`).
 * `\` escapes the next character inside quoted CSV fields;
 * `?ROWNUM` counts from 0;
 * `tarql:expandPrefix` and `tarql:expandPrefixedName` are available;
-* `BOUND(?column)` is always false, because oxi-gen substitutes CSV values into the query.
+* `BOUND(?column)` is always false, because oxi-gen substitutes CSV values into the query;
+* the casts `xsd:integer(…)`, `xsd:decimal(…)`, `xsd:double(…)`, `xsd:float(…)`, `xsd:boolean(…)`
+  and `xsd:dateTime(…)` accept only the XSD lexical form of a string: no surrounding spaces, and no
+  bare date for `xsd:dateTime`;
+* each typed value from the WHERE clause is written in oxi-gen's form (`"5000.00"` as
+  `"5000"^^xsd:decimal`, `"1"` as `true`, `"…+00:00"` as `"…Z"`; see `literals.py`). Constants
+  in the CONSTRUCT template are written as they are.
+
+`instances` evaluates the WHERE clause the same way, so Lutra's expansion of the instances
+gives the same terms as oxi-gen, lexical forms included. One oxi-gen behaviour is deliberately
+not copied: `STRDT` to a type derived from `xsd:integer` (`xsd:int`, …) or to `xsd:dateTimeStamp`
+gives `xsd:integer` or `xsd:dateTime` in oxi-gen, but keeps the requested datatype here.
 
 ## 5. SHACL shapes from templates (`shapes`)
 
