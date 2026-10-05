@@ -1,0 +1,70 @@
+# Generated from OTTR template <http://example.com/retail/template#CustomerRow>.
+# CSV columns: id, kind, name, legal_name, email, phone, born, founded, street, locality, postcode, country, homepage, parent, vip, credit_limit, customer_since, notes
+PREFIX rt: <http://example.com/retail/template#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX schema: <https://schema.org/>
+PREFIX ex: <http://example.com/ns#>
+PREFIX cur: <http://example.com/currency/>
+PREFIX cust: <http://example.com/customer/>
+PREFIX prod: <http://example.com/product/>
+PREFIX ord: <http://example.com/order/>
+PREFIX cat: <http://example.com/category/>
+PREFIX country: <http://example.com/country/>
+PREFIX status: <http://example.com/status/>
+
+CONSTRUCT {
+  ?id_iri
+      a ex:Customer, ?kind_iri ;
+      schema:name ?name ;
+      schema:legalName ?legal_name ;
+      schema:email ?email ;
+      schema:telephone ?phone ;
+      schema:birthDate ?born_typed ;
+      schema:foundingDate ?founded_typed ;
+      schema:url ?homepage_iri ;
+      schema:parentOrganization ?parent_iri ;
+      rdfs:comment ?notes ;
+      ?_g2 _:b1 ;
+      ?_g9 _:b8 .
+  ?parent_iri
+      schema:subOrganization ?id_iri .
+  _:b1
+      ?_g3 schema:PostalAddress ;
+      ?_g4 ?locality ;
+      ?_g5 ?street ;
+      ?_g6 ?postcode ;
+      ?_g7 ?country_iri .
+  _:b8
+      ?_g10 ex:Account ;
+      ?_g11 "customer account"@en, "kundekonto"@nb ;
+      ?_g12 ?customer_since_typed ;
+      ?_g13 ?vip_typed ;
+      ?_g14 ?credit_limit_typed .
+}
+WHERE {
+  BIND(IF(CONTAINS(STR(?id), "://"), IRI(?id), tarql:expandPrefixedName(?id)) AS ?id_iri)
+  BIND(IF(CONTAINS(STR(?kind), "://"), IRI(?kind), tarql:expandPrefixedName(?kind)) AS ?kind_iri)
+  BIND(STRDT(?born, xsd:date) AS ?born_typed)
+  BIND(STRDT(?founded, xsd:gYear) AS ?founded_typed)
+  BIND(IF(CONTAINS(STR(?country), "://"), IRI(?country), tarql:expandPrefixedName(?country)) AS ?country_iri)
+  BIND(IF(CONTAINS(STR(?homepage), "://"), IRI(?homepage), tarql:expandPrefixedName(?homepage)) AS ?homepage_iri)
+  BIND(IF(CONTAINS(STR(?parent), "://"), IRI(?parent), tarql:expandPrefixedName(?parent)) AS ?parent_iri)
+  BIND(STRDT(?vip, xsd:boolean) AS ?vip_typed)
+  BIND(STRDT(?credit_limit, xsd:decimal) AS ?credit_limit_typed)
+  BIND(STRDT(?customer_since, xsd:dateTime) AS ?customer_since_typed)
+  BIND(IF(sameTerm(?locality, ?locality), schema:address, ?_unbound) AS ?_g2)
+  BIND(IF(sameTerm(?id_iri, ?id_iri) && sameTerm(?locality, ?locality), rdf:type, ?_unbound) AS ?_g3)
+  BIND(IF(sameTerm(?id_iri, ?id_iri), schema:addressLocality, ?_unbound) AS ?_g4)
+  BIND(IF(sameTerm(?id_iri, ?id_iri) && sameTerm(?locality, ?locality), schema:streetAddress, ?_unbound) AS ?_g5)
+  BIND(IF(sameTerm(?id_iri, ?id_iri) && sameTerm(?locality, ?locality), schema:postalCode, ?_unbound) AS ?_g6)
+  BIND(IF(sameTerm(?id_iri, ?id_iri) && sameTerm(?locality, ?locality), schema:addressCountry, ?_unbound) AS ?_g7)
+  BIND(IF(sameTerm(?customer_since_typed, ?customer_since_typed), ex:account, ?_unbound) AS ?_g9)
+  BIND(IF(sameTerm(?customer_since_typed, ?customer_since_typed) && sameTerm(?id_iri, ?id_iri), rdf:type, ?_unbound) AS ?_g10)
+  BIND(IF(sameTerm(?customer_since_typed, ?customer_since_typed) && sameTerm(?id_iri, ?id_iri), rdfs:label, ?_unbound) AS ?_g11)
+  BIND(IF(sameTerm(?id_iri, ?id_iri), ex:customerSince, ?_unbound) AS ?_g12)
+  BIND(IF(sameTerm(?customer_since_typed, ?customer_since_typed) && sameTerm(?id_iri, ?id_iri), ex:vip, ?_unbound) AS ?_g13)
+  BIND(IF(sameTerm(?customer_since_typed, ?customer_since_typed) && sameTerm(?id_iri, ?id_iri), ex:creditLimit, ?_unbound) AS ?_g14)
+}

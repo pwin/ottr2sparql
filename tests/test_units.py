@@ -1,9 +1,8 @@
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from conftest import CASES, FIX, LUTRA, needs_lutra
+from conftest import CASES, FIX, lutra_lint, needs_lutra
 from ottr_tarql import Library, Unsupported, compose, decompose, parse_query, parse_stottr, serialize_query
 from ottr_tarql.ottr import render_document
 from ottr_tarql.sparql import Bind, Raw
@@ -165,11 +164,5 @@ def test_compose_without_inferred_binds_uses_columns_directly():
 def test_generated_library_lints_clean(tmp_path):
     queries = [parse_query((FIX / c).read_text(encoding="utf8"), Path(c).stem) for c in CASES]
     decompose(queries).write(tmp_path)
-    r = subprocess.run(
-        ["java", "-jar", str(LUTRA), "-m", "lint", "-l", str(tmp_path), "-L", "stottr", "-e", "stottr"],
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
-    assert r.returncode == 0, r.stdout + r.stderr
-    assert "WARNING" not in r.stdout + r.stderr and "ERROR" not in r.stdout + r.stderr, r.stdout + r.stderr
+    report = lutra_lint(tmp_path)
+    assert "WARNING" not in report and "ERROR" not in report, report

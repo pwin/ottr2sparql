@@ -1,0 +1,75 @@
+# Generated from OTTR template <http://example.com/retail/template#OrderRow>.
+# CSV columns: order, ordered_at, customer, channel, status, line, product, qty, unit_price, currency, discount_pct, shipped_on, carrier, tracking, gift_message, ROWNUM
+PREFIX rt: <http://example.com/retail/template#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX schema: <https://schema.org/>
+PREFIX ex: <http://example.com/ns#>
+PREFIX cur: <http://example.com/currency/>
+PREFIX cust: <http://example.com/customer/>
+PREFIX prod: <http://example.com/product/>
+PREFIX ord: <http://example.com/order/>
+PREFIX cat: <http://example.com/category/>
+PREFIX country: <http://example.com/country/>
+PREFIX status: <http://example.com/status/>
+
+CONSTRUCT {
+  ?order_iri
+      a schema:Order ;
+      schema:orderDate ?ordered_at_typed ;
+      schema:customer ?customer_iri ;
+      ex:channel ?channel ;
+      schema:orderStatus ?status_iri ;
+      ex:giftMessage ?gift_message ;
+      ?_g2 _:b1 .
+  _:b1
+      ?_g3 schema:OrderItem ;
+      ?_g4 ?line_typed ;
+      ?_g5 ?product_iri ;
+      ?_g6 ?qty_typed ;
+      ?_g7 ?discount_pct_typed ;
+      ?_g8 ?ROWNUM ;
+      ?_g11 _:b9 ;
+      ?_g16 _:b15 .
+  _:b9
+      ?_g12 schema:PriceSpecification ;
+      ?_g13 ?unit_price_typed ;
+      ?_g14 ?currency_iri_d10 .
+  _:b15
+      ?_g17 ex:Shipment ;
+      ?_g18 ?shipped_on_typed ;
+      ?_g19 ?carrier ;
+      ?_g20 ?tracking .
+}
+WHERE {
+  BIND(IF(CONTAINS(STR(?order), "://"), IRI(?order), tarql:expandPrefixedName(?order)) AS ?order_iri)
+  BIND(STRDT(?ordered_at, xsd:dateTime) AS ?ordered_at_typed)
+  BIND(IF(CONTAINS(STR(?customer), "://"), IRI(?customer), tarql:expandPrefixedName(?customer)) AS ?customer_iri)
+  BIND(IF(CONTAINS(STR(?status), "://"), IRI(?status), tarql:expandPrefixedName(?status)) AS ?status_iri)
+  BIND(STRDT(?line, xsd:integer) AS ?line_typed)
+  BIND(IF(CONTAINS(STR(?product), "://"), IRI(?product), tarql:expandPrefixedName(?product)) AS ?product_iri)
+  BIND(STRDT(?qty, xsd:integer) AS ?qty_typed)
+  BIND(STRDT(?unit_price, xsd:decimal) AS ?unit_price_typed)
+  BIND(IF(CONTAINS(STR(?currency), "://"), IRI(?currency), tarql:expandPrefixedName(?currency)) AS ?currency_iri)
+  BIND(STRDT(?discount_pct, xsd:decimal) AS ?discount_pct_typed)
+  BIND(STRDT(?shipped_on, xsd:date) AS ?shipped_on_typed)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?product_iri, ?product_iri), schema:orderedItem, ?_unbound) AS ?_g2)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), rdf:type, ?_unbound) AS ?_g3)
+  BIND(IF(sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), ex:lineNumber, ?_unbound) AS ?_g4)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri), schema:orderedItem, ?_unbound) AS ?_g5)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), schema:orderQuantity, ?_unbound) AS ?_g6)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), ex:discountPercent, ?_unbound) AS ?_g7)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), ex:sourceRow, ?_unbound) AS ?_g8)
+  BIND(COALESCE(?currency_iri, cur:EUR) AS ?currency_iri_d10)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?unit_price_typed, ?unit_price_typed), ex:unitPrice, ?_unbound) AS ?_g11)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?unit_price_typed, ?unit_price_typed), rdf:type, ?_unbound) AS ?_g12)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), schema:price, ?_unbound) AS ?_g13)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?unit_price_typed, ?unit_price_typed), schema:priceCurrency, ?_unbound) AS ?_g14)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?shipped_on_typed, ?shipped_on_typed), ex:shipment, ?_unbound) AS ?_g16)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?shipped_on_typed, ?shipped_on_typed), rdf:type, ?_unbound) AS ?_g17)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri), ex:shippedOn, ?_unbound) AS ?_g18)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?shipped_on_typed, ?shipped_on_typed), ex:carrier, ?_unbound) AS ?_g19)
+  BIND(IF(sameTerm(?line_typed, ?line_typed) && sameTerm(?order_iri, ?order_iri) && sameTerm(?product_iri, ?product_iri) && sameTerm(?shipped_on_typed, ?shipped_on_typed), ex:trackingNumber, ?_unbound) AS ?_g20)
+}

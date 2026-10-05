@@ -5,33 +5,17 @@
   the original queries / as the template semantics.
 """
 
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
-import rdflib
 
-from conftest import CASES, EXAMPLE, FIX, lutra_available, lutra_expand
+from conftest import CASES, EXAMPLE, FIX, assert_same, lutra_available, lutra_expand, needs_oxigen, oxigen
 from ottr_tarql import Library, compose, decompose, parse_query, parse_stottr, serialize_query
 from ottr_tarql.cli import load_library
-from ottr_tarql.runner import generate_instances, normalize, read_csv, run_query
-from test_roundtrip import QNS, assert_same
+from ottr_tarql.runner import generate_instances, read_csv, run_query
+from test_roundtrip import QNS
 
-OXI_GEN = os.environ.get("OXI_GEN") or shutil.which("oxi_gen")
-pytestmark = pytest.mark.skipif(not OXI_GEN, reason="set OXI_GEN to an oxi-gen binary to run these tests")
-
-
-def oxigen(query_text: str, csv: Path, header: bool, tmp: Path) -> rdflib.Graph:
-    q, out = tmp / "q.rq", tmp / "out.nt"
-    q.write_text(query_text, encoding="utf8")
-    args = [OXI_GEN, "-q", str(q), "-i", str(csv), "-o", str(out), "--ntriples"]
-    if not header:
-        args.append("-H")
-    r = subprocess.run(args, capture_output=True, text=True, timeout=120)
-    assert r.returncode == 0, r.stdout + r.stderr
-    return normalize(rdflib.Graph().parse(out, format="nt"))
+pytestmark = needs_oxigen
 
 
 @pytest.fixture(scope="module")
@@ -77,3 +61,15 @@ def test_example_person_on_oxigen(tmp_path):
     assert_same(run_query(query, rows), actual)
     if lutra_available():
         assert_same(lutra_expand(EXAMPLE, lib.prefixes, generate_instances(lib, "ex:Person", rows)), actual)
+
+
+@pytest.mark.xfail(strict=True, reason="known emulator gap: rdflib's xsd:dateTime() accepts a bare date, oxi-gen's does not")
+def test_emulator_datetime_cast_matches_oxigen(tmp_path):
+    csv = tmp_path / "dates.csv"
+    csv.write_text("d\n2019-03-01\n2019-03-01T09:30:00\n", encoding="utf8")
+    text = (
+        "PREFIX ex: <http://example.com/ns#>\nPREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"
+        "CONSTRUCT { ?s ex:when ?when } WHERE { BIND(IRI(CONCAT(str(ex:), ?d)) AS ?s) BIND(xsd:dateTime(?d) AS ?when) }\n"
+    )
+    rows = read_csv(csv.read_text(encoding="utf8"))
+    assert_same(oxigen(text, csv, True, tmp_path), run_query(parse_query(text), rows), value=True)
