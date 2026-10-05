@@ -223,5 +223,7 @@ text goes through as a string.
 | `decompose` | A BIND was typed by its outermost function, so `COALESCE(tarql:expandPrefixedName(…), IRI(…))` and `IF(…)` got no type. | Fixed (#5): the type all branches agree on. |
 | `decompose` | After `compose`, guards came back as predicate parameters. | Fixed (#5): guards become constant predicates, nesting and mandatory parameters. |
 | `decompose` | `tpl:Product`'s subject parameter was named `?catalogItem`, because two different item orders were used for naming. | Fixed (#5). |
-| CLI | Writing non-ASCII to a Windows console fails (`'charmap' codec can't encode character`), for example `ottr-tarql run` on these CSVs without `-o`. | Open |
+| CLI | Writing non-ASCII to a console in cp1252, as on many Windows systems, failed (`'charmap' codec can't encode character`), for example `ottr-tarql run` on these CSVs without `-o`. A CSV piped to stdin was decoded as cp1252. | Fixed (#6): stdin, stdout and stderr are UTF-8. |
+| CLI | On Windows, Turtle output (`run`, `expand`) was written with `\r\n` line ends. That changes the value of every long string (`"""…"""`) with a line break: `"…anvil.\nShips…"` came back as `"…anvil.\r\nShips…"`. | Fixed (#6): output is written with `\n`. |
+| CLI | rdflib's Turtle writer writes `"8990"^^xsd:decimal` as `8990.0`, which is the term `"8990.0"^^xsd:decimal`. | Fixed (#6): numbers use Turtle's short form only when it reads back as the same term. |
 | oxi-gen | `xsd:date(…)` panics (`UnsupportedCustomFunction`) instead of reporting an error. | Upstream |
