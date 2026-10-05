@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import io
 import sys
 from pathlib import Path
+
+import rdflib
+from rdflib.plugins.serializers.turtle import OBJECT, TurtleSerializer
 
 from .compose import compose, roots_in
 from .decompose import decompose
@@ -29,13 +33,38 @@ def load_library(paths: list[str]) -> Library:
 
 def _out(text: str, path: str | None) -> None:
     if path:
-        Path(path).write_text(text, encoding="utf8")
+        # no newline translation: Turtle long strings carry their line breaks, and
+        # writing "\r\n" for them on Windows would change the values
+        Path(path).write_text(text, encoding="utf8", newline="\n")
     else:
         sys.stdout.write(text)
 
 
+class _ExactTurtle(TurtleSerializer):
+    """rdflib's Turtle writer, except that a number or boolean is written in Turtle's
+    short form only if that reads back as the same term. rdflib would write
+    "8990"^^xsd:decimal as 8990.0, which is "8990.0"^^xsd:decimal."""
+
+    def label(self, node, position):
+        text = super().label(node, position)
+        if isinstance(node, rdflib.Literal) and node.datatype is not None and not text.startswith('"') and text != str(node):
+            return rdflib.Literal(str(node)).n3() + "^^" + self.label(node.datatype, OBJECT)
+        return text
+
+
+def _rdf_text(g: rdflib.Graph, ntriples: bool) -> str:
+    if ntriples:
+        return g.serialize(format="nt")
+    out = io.BytesIO()
+    _ExactTurtle(g).serialize(out, encoding="utf-8")
+    return out.getvalue().decode("utf-8")
+
+
 def _rows(args) -> list[dict]:
-    text = Path(args.input).read_text(encoding="utf-8-sig") if args.input else sys.stdin.read()
+    if args.input:
+        text = Path(args.input).read_text(encoding="utf-8-sig")
+    else:  # not in the console's encoding (cp1252 on many Windows systems)
+        text = sys.stdin.buffer.read().decode("utf-8-sig") if hasattr(sys.stdin, "buffer") else sys.stdin.read()
     delim = "\t" if args.tab else args.delimiter
     return read_csv(text, delim, header=not args.no_header_row, quote=args.quote_char, escape=args.escape_char)
 
@@ -90,7 +119,7 @@ def cmd_compose(a) -> int:
 def cmd_shapes(a) -> int:
     lib = load_library(a.library)
     g = generate_shapes(lib, a.template, a.shapes_ns, max_counts=a.max_counts, allow_subtypes=a.allow_subtypes)
-    _out(g.serialize(format="turtle"), a.output)
+    _out(_rdf_text(g, ntriples=False), a.output)
     return 0
 
 
@@ -106,7 +135,7 @@ def cmd_run(a) -> int:
     g = run_query(q, _rows(a))
     for p, ns in q.prefixes.items():
         g.bind(p, ns)
-    _out(g.serialize(format="nt" if a.ntriples else "turtle"), a.output)
+    _out(_rdf_text(g, a.ntriples), a.output)
     return 0
 
 
@@ -121,7 +150,7 @@ def cmd_expand(a) -> int:
     g = expand(lib, insts)
     for p, ns in lib.prefixes.items():
         g.bind(p, ns)
-    _out(g.serialize(format="nt" if a.ntriples else "turtle"), a.output)
+    _out(_rdf_text(g, a.ntriples), a.output)
     return 0
 
 
@@ -183,6 +212,11 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_expand)
 
     a = ap.parse_args(argv)
+    # UTF-8 whatever the console encoding (cp1252 on many Windows systems), and no
+    # newline translation (see _out)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", newline="\n")
     try:
         return a.fn(a)
     except (OSError, KeyError, ValueError) as e:  # Unsupported and SyntaxErr are ValueErrors
