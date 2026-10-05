@@ -88,7 +88,7 @@ tpl:Order [
     ottr:IRI ?order,
     ? xsd:string ?channel,
     ? xsd:string ?giftMessage,
-    ? ?customer,
+    ? ottr:IRI ?customer,
     ? xsd:dateTime ?orderDate,
     ? ottr:IRI ?orderStatus,
     ? ottr:IRI ?orderedItem
@@ -111,7 +111,7 @@ tpl:OrderItem [
     ? xsd:integer ?sourceRow,
     ? ottr:IRI ?unitPrice,
     ? xsd:integer ?orderQuantity,
-    ? ?orderedItem
+    ? ottr:IRI ?orderedItem
 ]
 :: {
     ottr:Triple(?orderItem, ex:discountPercent, ?discountPercent),
@@ -127,7 +127,7 @@ tpl:OrderItem [
 tpl:PriceSpecification [
     ottr:IRI ?priceSpecification,
     ? xsd:decimal ?price,
-    ? ?priceCurrency
+    ? ottr:IRI ?priceCurrency
 ]
 :: {
     ottr:Triple(?priceSpecification, rdf:type, schema:PriceSpecification),
@@ -149,7 +149,7 @@ tpl:Shipment [
 } .
 
 tpl:Product [
-    ottr:IRI ?catalogItem,
+    ottr:IRI ?product,
     ? xsd:date ?discontinuedOn,
     ? xsd:boolean ?inStock,
     ? xsd:decimal ?rating,
@@ -165,21 +165,21 @@ tpl:Product [
     ? ottr:IRI ?weight
 ]
 :: {
-    ottr:Triple(?catalogItem, ex:discontinuedOn, ?discontinuedOn),
-    ottr:Triple(?catalogItem, ex:inStock, ?inStock),
-    ottr:Triple(?catalogItem, ex:rating, ?rating),
-    ottr:Triple(?catalogItem, ex:replaces, ?replaces),
-    ottr:Triple(?catalogItem, ex:stockLevel, ?stockLevel),
-    ottr:Triple(?catalogItem, rdf:type, ex:CatalogItem),
-    ottr:Triple(?catalogItem, rdf:type, schema:Product),
-    ottr:Triple(?catalogItem, rdf:type, ?type),
-    ottr:Triple(?catalogItem, rdf:type, ?type2),
-    ottr:Triple(?catalogItem, schema:description, ?description),
-    ottr:Triple(?catalogItem, schema:manufacturer, ?manufacturer),
-    ottr:Triple(?catalogItem, schema:name, ?name),
-    ottr:Triple(?catalogItem, schema:priceSpecification, ?priceSpecification),
-    ottr:Triple(?catalogItem, schema:releaseDate, ?releaseDate),
-    ottr:Triple(?catalogItem, schema:weight, ?weight)
+    ottr:Triple(?product, ex:discontinuedOn, ?discontinuedOn),
+    ottr:Triple(?product, ex:inStock, ?inStock),
+    ottr:Triple(?product, ex:rating, ?rating),
+    ottr:Triple(?product, ex:replaces, ?replaces),
+    ottr:Triple(?product, ex:stockLevel, ?stockLevel),
+    ottr:Triple(?product, rdf:type, ex:CatalogItem),
+    ottr:Triple(?product, rdf:type, schema:Product),
+    ottr:Triple(?product, rdf:type, ?type),
+    ottr:Triple(?product, rdf:type, ?type2),
+    ottr:Triple(?product, schema:description, ?description),
+    ottr:Triple(?product, schema:manufacturer, ?manufacturer),
+    ottr:Triple(?product, schema:name, ?name),
+    ottr:Triple(?product, schema:priceSpecification, ?priceSpecification),
+    ottr:Triple(?product, schema:releaseDate, ?releaseDate),
+    ottr:Triple(?product, schema:weight, ?weight)
 } .
 
 tpl:Predecessor [

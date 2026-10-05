@@ -27,7 +27,7 @@ q:products [
     ? ottr:IRI ?price_spec,
     ? ottr:IRI ?weight,
     ? xsd:decimal ?amount,
-    ? ?currency_iri,
+    ? ottr:IRI ?currency_iri,
     ? xsd:decimal ?kg
 ]
   @@ tq:Source("products.rq"),

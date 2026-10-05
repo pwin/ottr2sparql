@@ -1,14 +1,23 @@
+import tempfile
 from pathlib import Path
 
 import pytest
 
-from conftest import CASES, FIX, lutra_lint, needs_lutra
+from conftest import CASES, EXAMPLE, FIX, assert_same, lutra_lint, needs_lutra
 from ottr_tarql import Library, Unsupported, compose, decompose, parse_query, parse_stottr, serialize_query
+from ottr_tarql.cli import load_library
 from ottr_tarql.ottr import render_document
+from ottr_tarql.runner import expand, generate_instances, read_csv, run_query
 from ottr_tarql.sparql import Bind, Raw
-from ottr_tarql.terms import IRI, NONE, XSD, BNode, ListTerm, Literal, Var
+from ottr_tarql.terms import IRI, NONE, OTTR_TRIPLE as TRIPLE, TQ, XSD, BNode, ListTerm, Literal, Var
 
 TPL = "http://example.org/ottr/template/"
+QNS = "http://example.org/ottr/query/"
+EX_NS = "http://example.com/ns#"
+
+
+def _binds(root):
+    return [a for a in root.annotations if a.template == TQ + "Bind"]
 
 
 def test_parse_construct_forms():
@@ -130,6 +139,50 @@ def test_predicate_variable_is_nonblank():
     d = decompose([_q("q", "?x ?p ?o .", "BIND(IRI(?i) AS ?x) BIND(IRI(?pp) AS ?p)")])
     assert d.roots[0].param("p").nonblank
     assert d.library[0].params[1].nonblank
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ("COALESCE(tarql:expandPrefixedName(?c), IRI(?c))", "http://ns.ottr.xyz/0.4/IRI"),
+        ("COALESCE(tarql:expandPrefixedName(?c), :default)", "http://ns.ottr.xyz/0.4/IRI"),
+        ('IF(CONTAINS(STR(?c), "://"), IRI(?c), tarql:expandPrefixedName(?c))', "http://ns.ottr.xyz/0.4/IRI"),
+        ("COALESCE(xsd:integer(?n), 0)", XSD + "integer"),
+        ("COALESCE(xsd:integer(?n), 0.5)", None),  # the branches disagree
+        ("IF(BOUND(?a), :Class, ?none)", None),  # ?none could be a column holding a string
+        ("IF(BOUND(?a), ?x, ?y)", XSD + "decimal"),  # through the BINDs of ?x and ?y
+    ],
+)
+def test_types_through_coalesce_and_if(expr, expected):
+    q = _q("q", "?s :p ?v .", f"BIND(xsd:decimal(?d) AS ?x) BIND(xsd:decimal(?e) AS ?y) BIND({expr} AS ?v)")
+    q.prefixes.add("xsd", XSD)
+    assert decompose([q]).roots[0].param("v").type == expected
+
+
+def test_compose_guards_come_back_as_mandatory_parameters():
+    """OTTR -> TARQL -> OTTR: the guards on ex:ReportsTo's triples become a nested
+    template with ?manager mandatory and constant predicates, meaning the same."""
+    lib = Library([parse_stottr((EXAMPLE / "people.stottr").read_text(encoding="utf8"))])
+    composed = compose(lib, "ex:Person").query
+    assert any(isinstance(p, Var) for _, p, _ in composed.triples)
+    d = decompose([parse_query(serialize_query(composed), "person")])
+    assert not any(isinstance(i.args[1], Var) for t in d.library for i in t.body if i.template == TRIPLE)
+    assert not any(a.args[1].lexical.startswith("IF(sameTerm") for a in _binds(d.roots[0]))
+    reports = next(t for t in d.library if any(i.args[1] == IRI(EX_NS + "reportsTo") for i in t.body))
+    assert not reports.param("reportsTo").optional
+    rows = read_csv((EXAMPLE / "people.csv").read_text(encoding="utf8"))
+    with tempfile.TemporaryDirectory() as tmp:
+        d.write(tmp)
+        back = load_library([tmp])
+    assert_same(run_query(composed, rows), run_query(compose(back, QNS + "person").query, rows))
+    assert_same(run_query(composed, rows), expand(back, generate_instances(back, QNS + "person", rows)))
+
+
+def test_guard_lookalike_used_elsewhere_is_left_alone():
+    q = _q("q", "?x ?g ?o . ?x :also ?g .", "BIND(IRI(?i) AS ?x) BIND(IF(sameTerm(?o, ?o), :p, ?_unbound) AS ?g)")
+    d = decompose([q])
+    assert d.roots[0].param("g") is not None
+    assert [a.args[0].lexical for a in _binds(d.roots[0])] == ["x", "g"]
 
 
 def test_list_parameter_cannot_be_composed():

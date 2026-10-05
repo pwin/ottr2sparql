@@ -266,17 +266,77 @@ _IRI_FUNCS = {"IRI", "URI"}
 _STR_FUNCS = {"STR", "CONCAT", "LCASE", "UCASE", "SUBSTR", "REPLACE", "STRBEFORE", "STRAFTER", "ENCODE_FOR_URI", "STRUUID"}
 
 
-def infer_expr_type(expr: str, prefixes: PrefixMap) -> str | None:
-    """Best-effort OTTR type (IRI) of a BIND expression, or None if unknown."""
+def infer_expr_type(expr: str, prefixes: PrefixMap, var_type=None) -> str | None:
+    """Best-effort OTTR type (IRI) of a BIND expression, or None if unknown.
+
+    ``COALESCE(a, b)`` and ``IF(c, a, b)`` have the type that ``a`` and ``b`` agree
+    on. ``var_type(name)`` gives the type of a variable used as such a branch."""
     try:
         toks = tokenize(expr)
     except SyntaxErr:
         return None
+    return _expr_type(toks, prefixes, var_type or (lambda name: None))
+
+
+def _call_args(toks: list[Token]) -> list[list[Token]] | None:
+    """The argument token lists of ``f(a, b, ...)``, or None if ``toks`` is not one call."""
+    if len(toks) < 3 or not (toks[1].kind == "PUNCT" and toks[1].value == "("):
+        return None
+    args, current, depth = [], [], 0
+    for i, t in enumerate(toks[2:], start=2):
+        if t.kind == "PUNCT" and t.value in "([{":
+            depth += 1
+        elif t.kind == "PUNCT" and t.value in ")]}":
+            if depth == 0:
+                if i != len(toks) - 1:
+                    return None
+                return args + [current] if current else args
+            depth -= 1
+        elif depth == 0 and t.kind == "PUNCT" and t.value == ",":
+            args.append(current)
+            current = []
+            continue
+        current.append(t)
+    return None
+
+
+def _term_type(t: Token, prefixes: PrefixMap, var_type) -> str | None:
+    if t.kind in ("IRIREF", "PNAME"):
+        return OTTR_IRI
+    if t.kind == "STRING":
+        return XSD + "string"
+    if t.kind == "NUMBER":
+        return XSD + t.numtype
+    if t.kind == "NAME" and t.value in ("true", "false"):
+        return XSD + "boolean"
+    if t.kind == "VAR":
+        return var_type(t.value)
+    return None
+
+
+def _expr_type(toks: list[Token], prefixes: PrefixMap, var_type) -> str | None:
+    if len(toks) == 1:
+        return _term_type(toks[0], prefixes, var_type)
+    if len(toks) == 2 and toks[0].kind == "STRING" and toks[1].kind == "LANGTAG":
+        return RDF + "langString"
+    if len(toks) == 3 and toks[0].kind == "STRING" and toks[1].kind == "DTYPE":
+        dt = toks[2]
+        if dt.kind == "PNAME" and dt.prefix in prefixes.map:
+            return prefixes.expand(dt.prefix, dt.local)
+        return dt.value if dt.kind == "IRIREF" else None
     if len(toks) < 2 or not (toks[1].kind == "PUNCT" and toks[1].value == "("):
         return None
     head = toks[0]
     if head.kind == "NAME":
         f = head.value.upper()
+        if f in ("COALESCE", "IF"):
+            args = _call_args(toks)
+            if not args or (f == "IF" and len(args) != 3):
+                return None
+            types = {_expr_type(a, prefixes, var_type) for a in (args if f == "COALESCE" else args[1:])}
+            return types.pop() if len(types) == 1 else None
+        if f == "BNODE":
+            return OTTR_IRI
         if f in _IRI_FUNCS:
             return OTTR_IRI
         if f in _STR_FUNCS:
