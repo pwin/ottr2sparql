@@ -47,17 +47,17 @@ Round trip (OTTR → TARQL → OTTR): [`ottr-round-trip/`](ottr-round-trip).
 
 | | native | from TARQL | round trip |
 |---|---:|---:|---:|
-| templates (not counting roots) | 13 | 11 | 11 |
-|   used by more than one root | 4 | 1 | 1 |
-| instances in template bodies | 65 | 66 | 66 |
-| nesting depth (root to `ottr:Triple`) | 4 | 2 | 2 |
-| parameters | 68 | 64 | 97 |
-|   datatype (`xsd:decimal`, …) | 19 | 18 | 18 |
-|   IRI (`ottr:IRI`, `owl:Class`, …) | 30 | 28 | 56 |
-|   `xsd:string` | 10 | 14 | 14 |
-|   untyped | 9 | 4 | 9 |
-|   mandatory | 30 | 11 | 11 |
-|   non-blank (`!`) | 10 | 0 | 34 |
+| templates (not counting roots) | 13 | 11 | 13 |
+|   used by more than one root | 4 | 1 | 0 |
+| instances in template bodies | 65 | 66 | 71 |
+| nesting depth (root to `ottr:Triple`) | 4 | 2 | 3 |
+| parameters | 68 | 64 | 65 |
+|   datatype (`xsd:decimal`, …) | 19 | 18 | 21 |
+|   IRI (`ottr:IRI`, `owl:Class`, …) | 30 | 31 | 28 |
+|   `xsd:string` | 10 | 14 | 16 |
+|   untyped | 9 | 1 | 0 |
+|   mandatory | 30 | 11 | 22 |
+|   non-blank (`!`) | 10 | 0 | 0 |
 |   with a default | 1 | 0 | 0 |
 
 ## Column types
@@ -90,7 +90,7 @@ value made from that column.
 | products | `description` | `untyped` | `xsd:string` | added |
 | products | `category` | `owl:Class` | `ottr:IRI` | generalised |
 | products | `price` | `xsd:decimal` | `xsd:decimal` |  |
-| products | `currency` | `ottr:IRI` | `untyped` | lost |
+| products | `currency` | `ottr:IRI` | `ottr:IRI` |  |
 | products | `weight_kg` | `xsd:decimal` | `xsd:decimal` |  |
 | products | `in_stock` | `xsd:boolean` | `xsd:boolean` |  |
 | products | `stock_qty` | `xsd:integer` | `xsd:integer` |  |
@@ -101,14 +101,14 @@ value made from that column.
 | products | `rating` | `xsd:decimal` | `xsd:decimal` |  |
 | orders | `order` | `ottr:IRI` | `ottr:IRI` |  |
 | orders | `ordered_at` | `xsd:dateTime` | `xsd:dateTime` |  |
-| orders | `customer` | `ottr:IRI` | `untyped` | lost |
+| orders | `customer` | `ottr:IRI` | `ottr:IRI` |  |
 | orders | `channel` | `untyped` | `xsd:string` | added |
 | orders | `status` | `owl:NamedIndividual` | `ottr:IRI` | generalised |
 | orders | `line` | `xsd:integer` | `xsd:integer` |  |
-| orders | `product` | `ottr:IRI` | `untyped` | lost |
+| orders | `product` | `ottr:IRI` | `ottr:IRI` |  |
 | orders | `qty` | `xsd:integer` | `xsd:integer` |  |
 | orders | `unit_price` | `xsd:decimal` | `xsd:decimal` |  |
-| orders | `currency` | `ottr:IRI` | `untyped` | lost |
+| orders | `currency` | `ottr:IRI` | `ottr:IRI` |  |
 | orders | `discount_pct` | `xsd:decimal` | `xsd:decimal` |  |
 | orders | `shipped_on` | `xsd:date` | `xsd:date` |  |
 | orders | `carrier` | `xsd:string` | `xsd:string` |  |

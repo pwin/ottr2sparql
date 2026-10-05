@@ -57,8 +57,12 @@ The input is a **set** of queries. Reuse across files is the point of this step.
    and opaque raw clauses (FILTER, OPTIONAL, VALUES, …). Both kinds are kept as source text, in
    their original order.
 2. **Type the variables.** Each variable in the CONSTRUCT template gets an OTTR type:
-   * `IRI()`/`URI()`/`tarql:expandPrefixedName()` → `ottr:IRI`; `xsd:T(...)` or `STRDT(_, xsd:T)` →
-     `xsd:T`; `STRLANG` → `rdf:langString`; string functions → `xsd:string`;
+   * `IRI()`/`URI()`/`tarql:expandPrefixedName()`/`BNODE()` → `ottr:IRI`; `xsd:T(...)` or
+     `STRDT(_, xsd:T)` → `xsd:T`; `STRLANG` → `rdf:langString`; string functions → `xsd:string`;
+   * `COALESCE(a, b, …)` and `IF(c, a, b)` → the type that `a`, `b`, … agree on. A constant
+     branch has its own type (`cur:EUR` is `ottr:IRI`). A variable branch has the type of its BIND,
+     or `xsd:string` if it is a CSV column. So `IF(BOUND(?x), ex:C, ?none)` stays untyped, because
+     `?none` could be a column;
    * a variable that is never a BIND target is a raw CSV column → `xsd:string`. `?ROWNUM` → `xsd:integer`;
    * a variable in subject or predicate position → `ottr:IRI`. A variable in predicate position is
      also **non-blank** (`!`), because `ottr:Triple`'s predicate is non-blank and Lutra checks that
@@ -88,6 +92,28 @@ Mandatory vs optional parameters:
   of that subject, and OTTR drops the whole shape instance. The result is the same.
 * *Object parameters are optional.* Only that one triple disappears. The `none` reaches
   `ottr:Triple`, which drops it.
+
+### Queries made by `compose`
+
+A query that `compose` wrote carries guards (§3): predicates `?_gN` that are bound to a constant
+only when some mandatory arguments are bound. Cutting such a query by subject would make every
+guarded predicate a template parameter. So `decompose` first undoes the guards:
+
+1. **Recover the predicates.** `BIND(IF(sameTerm(?a, ?a) && …, pred, ?u) AS ?_gN)` is
+   recognised when `?_gN` is used only as a predicate and `?u` is never bound. Each triple then
+   gets `pred` back and the set of variables the guard required. The guard BINDs are dropped.
+2. **Group by requirements.** A triple *requires* its guard's variables, plus those of its own
+   variables that some guard requires. Triples with the same requirements, linked by a subject or
+   a blank node, form one template. Its new requirements are mandatory parameters.
+3. **Nest only when needed.** A group goes inside another group whose requirements it extends
+   in two cases: when it shares a blank node with that group, or when it requires a variable it
+   does not use (the enclosing template must then require it, or the parameter would be unused).
+   Otherwise the root calls it. Each blank node is made by the lowest template above all its uses.
+
+A triple is emitted exactly when its own variables and its requirements are bound, as before.
+For the retail example, `compose` then `decompose` gives back nested templates like the
+hand-written ones (see [COMPARISON.md](COMPARISON.md)). Queries without guards are decomposed
+as described above.
 
 ### Worked example (oxi-gen `successor_field.rq` and `optional_field.rq`)
 

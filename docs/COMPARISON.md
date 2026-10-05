@@ -167,24 +167,35 @@ Other differences:
 
   | Outcome | Columns | Why |
   |---|---:|---|
-  | same type | 33 | casts and `STRDT` give the datatype; `tarql:expandPrefixedName` gives `ottr:IRI` |
-  | type lost | 4 | `currency` (products and orders), `customer`, `product`: values built with `COALESCE(…)`. `decompose` types a BIND by its outermost function only. |
+  | same type | 37 | Casts and `STRDT` give the datatype, and `tarql:expandPrefixedName` gives `ottr:IRI`. `COALESCE(…)` and `IF(…)` get the type that all their branches agree on. |
   | generalised | 3 | `kind`, `category` (`owl:Class`) and `status` (`owl:NamedIndividual`) become `ottr:IRI`. A query cannot say a value is a class. |
-  | type added | 8 | columns used as they are become `xsd:string`, and `?ROWNUM` becomes `xsd:integer`, where the native templates left them untyped |
+  | type added | 8 | Columns used as they are become `xsd:string`, and `?ROWNUM` becomes `xsd:integer`, where the native templates left them untyped. |
 
-  Ids built with `COALESCE` keep `ottr:IRI` only because they are subjects.
+  Before #5, decompose typed a BIND by its outermost function only. The four values built
+  with `COALESCE(tarql:expandPrefixedName(…), …)` lost their type.
 
 ### Round trips
 
 * **TARQL → OTTR → TARQL is lossless.** It gives back the same prefixes, the same
   triple patterns and the same BINDs in the same order, and oxi-gen output that is exactly
   the same. Only comments and layout are lost.
-* **OTTR → TARQL → OTTR keeps the meaning but not the design.** The output is still the
-  same graph. But the guards turn constant predicates into variables, so `decompose` sees
-  predicate parameters. The library grows from 68 to 97 parameters, 34 of them
-  `!? ottr:IRI ?predicateN`. Templates get names such as `tpl:Node_4`, and
-  `tpl:Node_4`'s properties are arguments instead of `schema:addressLocality` and so on.
-  Modularity cannot be recovered from the flat query.
+* **OTTR → TARQL → OTTR gets most of the design back.** The output is the same graph, term
+  for term. `decompose` recognises compose's guards (`IF(sameTerm(?a, ?a) && …, pred, ?_unbound)`),
+  puts the constant predicates back, and groups the triples by the variables they require
+  instead of by subject. The result is 13 templates for the native 13:
+  * `tpl:PostalAddress` makes its own blank node and has `?addressLocality` mandatory, like
+    `rt:Address`.
+  * `tpl:OrderItem` calls `tpl:PriceSpecification` and `tpl:Shipment`, as `rt:OrderLine`
+    calls `rt:Price` and `rt:Shipment`.
+  * There are no predicate parameters, and every parameter has a type.
+
+  Two things are not recovered:
+  * The generic leaves (`rt:Value`, `rt:Typed`, `rt:Inverse`) are inlined. Nesting depth is
+    3 instead of 4, and no template is shared between the CSVs.
+  * Classes become `ottr:IRI`.
+
+  Before #5, the guards came back as 34 `!? ottr:IRI ?predicateN` parameters, in templates
+  with names like `tpl:Node_4`.
 
 ## 3. Strong and regular typing on bad data
 
@@ -209,9 +220,8 @@ text goes through as a string.
 |---|---|---|
 | emulator (`run`), `instances` | Lexical forms followed rdflib, not oxi-gen. Decimals kept the cell's form, where oxi-gen writes `129.90` as `129.9`. Date-times were rewritten (`Z` as `+00:00`), which oxi-gen does not do. | Fixed (#4): values take oxi-gen's forms, and every route now matches term for term. |
 | emulator | rdflib's `xsd:dateTime("2019-03-01")` gave `2019-03-01T00:00:00` where oxi-gen gives an error, so the graphs differed. | Fixed (#4): strict casts during evaluation. |
-| `decompose` | A BIND is typed by its outermost function, so `COALESCE(tarql:expandPrefixedName(…), IRI(…))` and `IF(…)` get no type. | Open |
-| `decompose` | After `compose`, guards come back as predicate parameters. | Open |
-| `decompose` | `tpl:Product`'s subject parameter is named `?catalogItem`, because two different item orders are used for naming. | Open |
+| `decompose` | A BIND was typed by its outermost function, so `COALESCE(tarql:expandPrefixedName(…), IRI(…))` and `IF(…)` got no type. | Fixed (#5): the type all branches agree on. |
+| `decompose` | After `compose`, guards came back as predicate parameters. | Fixed (#5): guards become constant predicates, nesting and mandatory parameters. |
+| `decompose` | `tpl:Product`'s subject parameter was named `?catalogItem`, because two different item orders were used for naming. | Fixed (#5). |
 | CLI | Writing non-ASCII to a Windows console fails (`'charmap' codec can't encode character`), for example `ottr-tarql run` on these CSVs without `-o`. | Open |
-| stOTTR parser | Accepts multi-line `/* … */` comments, which Lutra rejects. The library uses `#` comments. | Open |
 | oxi-gen | `xsd:date(…)` panics (`UnsupportedCustomFunction`) instead of reporting an error. | Upstream |

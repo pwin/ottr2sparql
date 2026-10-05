@@ -290,6 +290,12 @@ def test_tarql_round_trip_on_oxigen(d, decomposed, tmp_path):
     assert_same(expected(d), oxigen(back, csv_path(d), True, tmp_path))
 
 
+@needs_lutra
+def test_ottr_round_trip_lints_clean(ottr_round_trip):
+    report = lutra_lint(ottr_round_trip[0])
+    assert "WARNING" not in report and "ERROR" not in report, report
+
+
 def test_ottr_round_trip_is_checked_in(ottr_round_trip):
     for name, text in decomposed_files(ottr_round_trip[0]).items():
         snapshot(CONVERTED / "ottr-round-trip" / name, text)
@@ -410,8 +416,11 @@ def test_native_ottr_is_modular_and_converted_ottr_is_flat(native_ottr, decompos
     # decompose leaves value parameters optional: nodes are made in the WHERE clause instead
     assert from_tarql["  mandatory"] == from_tarql["templates (not counting roots)"]
     assert native["  mandatory"] > native["templates (not counting roots)"]
-    # after OTTR -> TARQL -> OTTR, guarded predicates come back as non-blank parameters
-    assert round_trip["  non-blank (`!`)"] > from_tarql["  non-blank (`!`)"] == 0
+    # after OTTR -> TARQL -> OTTR, compose's guards come back as nesting and mandatory
+    # parameters, with constant predicates
+    assert round_trip["nesting depth (root to `ottr:Triple`)"] == 3
+    assert round_trip["  mandatory"] > from_tarql["  mandatory"]
+    assert round_trip["  non-blank (`!`)"] == round_trip["  untyped"] == 0
 
 
 def test_composed_tarql_is_larger_but_has_the_same_patterns(composed):
@@ -426,16 +435,15 @@ def test_decompose_recovers_most_column_types(native_ottr, decomposed):
     found: dict[str, set] = {}
     for d, col, native, conv in column_types(native_ottr, decomposed[1]):
         found.setdefault(classify(native, conv), set()).add(f"{d}.{col}")
-    # decompose types a BIND by its outermost function, so COALESCE(tarql:expandPrefixedName(?c), ...)
-    # gives no type. (A subject is always ottr:IRI, which is why ids built that way keep theirs.)
-    assert found["lost"] == {"products.currency", "orders.customer", "orders.product", "orders.currency"}
+    # COALESCE(...) and IF(...) take the type their branches agree on, so no type is lost
+    assert "lost" not in found
     # a column used as it is becomes xsd:string, and ?ROWNUM xsd:integer, where the native
     # templates leave them untyped
     assert found["added"] == {"customers.name", "customers.legal_name", "customers.email", "customers.notes",
                               "products.description", "orders.channel", "orders.gift_message", "orders.ROWNUM"}
     # TARQL has no way to say a value is a class or an individual
     assert found["generalised"] == {"customers.kind", "products.category", "orders.status"}
-    assert len(found["same"]) == 33
+    assert len(found["same"]) == 37
 
 
 def test_metrics_are_checked_in(native_ottr, composed, decomposed, ottr_round_trip):
