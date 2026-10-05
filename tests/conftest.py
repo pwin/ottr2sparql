@@ -2,8 +2,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from contextlib import contextmanager, nullcontext
-from decimal import Decimal
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -50,7 +49,8 @@ def lutra_expand(library_dir: Path, prefixes, instances) -> rdflib.Graph:
             capture_output=True, text=True, timeout=300,
         )
         assert r.returncode == 0 and out.exists(), r.stdout + r.stderr
-        return normalize(rdflib.Graph().parse(out, format="turtle"))
+        with literal_forms_kept():
+            return normalize(rdflib.Graph().parse(out, format="turtle"))
 
 
 def lutra_lint(library_dir: Path) -> str:
@@ -76,9 +76,8 @@ def literal_forms_kept():
         rdflib.NORMALIZE_LITERALS = saved
 
 
-def oxigen(query_text: str, csv: Path, header: bool, tmp: Path, exact: bool = False) -> rdflib.Graph:
-    """Run a query over a CSV file with the real oxi-gen binary. With ``exact``, the
-    literals keep oxi-gen's lexical forms."""
+def oxigen(query_text: str, csv: Path, header: bool, tmp: Path) -> rdflib.Graph:
+    """Run a query over a CSV file with the real oxi-gen binary; literals keep oxi-gen's forms."""
     q, out = tmp / "q.rq", tmp / "out.nt"
     q.write_text(query_text, encoding="utf8")
     args = [OXI_GEN, "-q", str(q), "-i", str(csv), "-o", str(out), "--ntriples"]
@@ -86,38 +85,12 @@ def oxigen(query_text: str, csv: Path, header: bool, tmp: Path, exact: bool = Fa
         args.append("-H")
     r = subprocess.run(args, capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stdout + r.stderr
-    with literal_forms_kept() if exact else nullcontext():
+    with literal_forms_kept():
         return normalize(rdflib.Graph().parse(out, format="nt"))
 
 
-def by_value(g: rdflib.Graph) -> rdflib.Graph:
-    """Give every well-formed typed literal one lexical form per value, so that
-    "129.90"^^xsd:decimal (kept by Lutra and rdflib) matches "129.9"^^xsd:decimal
-    (oxi-gen's canonical form), and "...Z" matches "...+00:00". Ill-typed literals
-    are left alone."""
-    out = rdflib.Graph()
-    for s, p, o in g:
-        if isinstance(o, rdflib.Literal) and o.datatype is not None and not o.ill_typed:
-            v = o.toPython()
-            if isinstance(v, bool):
-                lex = "true" if v else "false"
-            elif isinstance(v, Decimal):
-                lex = format(v.normalize(), "f")
-            elif isinstance(v, (int, float)):
-                lex = repr(v)
-            elif hasattr(v, "isoformat"):
-                lex = v.isoformat()
-            else:
-                lex = str(o)
-            o = rdflib.Literal(lex, datatype=o.datatype)
-        out.add((s, p, o))
-    return out
-
-
-def assert_same(expected: rdflib.Graph, actual: rdflib.Graph, value: bool = False):
-    """Graph isomorphism; with ``value``, typed literals are compared by value."""
-    if value:
-        expected, actual = by_value(expected), by_value(actual)
+def assert_same(expected: rdflib.Graph, actual: rdflib.Graph):
+    """Graph isomorphism: the same terms, lexical forms included, up to blank node names."""
     if not isomorphic(expected, actual):
         _, only_e, only_a = graph_diff(to_isomorphic(expected), to_isomorphic(actual))
         pytest.fail(

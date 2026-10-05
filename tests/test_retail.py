@@ -14,10 +14,9 @@ Each is converted into the other form:
 * ``converted/ottr-round-trip/``: decompose(compose(native OTTR)).
 
 Every route must produce the RDF in ``expected/*.nt``, which is oxi-gen's output for the
-native TARQL. Routes that run on oxi-gen must match it term for term, lexical forms
-included. The other routes are compared by value: Lutra keeps "129.90"^^xsd:decimal where
-oxi-gen writes "129.9", and rdflib (in the emulator and in ``instances``) writes
-"...+00:00" where oxi-gen writes "...Z".
+native TARQL, term for term and lexical forms included. That holds for Lutra and the rdflib
+emulator too, because ``instances`` and ``run`` write typed values the way oxi-gen does
+("129.90" as "129.9"^^xsd:decimal; see ``ottr_tarql.literals``).
 
 ``converted/METRICS.md`` compares the native and converted forms, and docs/COMPARISON.md
 discusses the results. Regenerate the checked-in files under ``converted/`` and
@@ -137,7 +136,7 @@ def ottr_round_trip(composed, tmp_path_factory) -> tuple[Path, Library]:
 @pytest.mark.parametrize("d", DATASETS)
 def test_native_tarql_on_oxigen(d, tmp_path):
     """oxi-gen runs the hand-written TARQL; its output is the reference for every other route."""
-    out = oxigen(native_text(d), csv_path(d), True, tmp_path, exact=True)
+    out = oxigen(native_text(d), csv_path(d), True, tmp_path)
     if UPDATE:
         # N-Triples keep oxi-gen's lexical forms (rdflib's Turtle writer turns "250000"^^xsd:decimal
         # into 250000.0); canonical blank node labels and sorted lines keep the file stable
@@ -190,7 +189,7 @@ def test_reference_output_has_the_tricky_cells_right():
 
 @pytest.mark.parametrize("d", DATASETS)
 def test_native_tarql_on_the_emulator(d):
-    assert_same(expected(d), run_query(parse_query(native_text(d)), rows(d)), value=True)
+    assert_same(expected(d), run_query(parse_query(native_text(d)), rows(d)))
 
 
 # ---------------------------------------------------------------------------- native OTTR
@@ -206,13 +205,13 @@ def test_native_ottr_lints_clean():
 @pytest.mark.parametrize("d", DATASETS)
 def test_native_ottr_on_lutra(d, native_ottr):
     insts = generate_instances(native_ottr, DATASETS[d], rows(d))
-    assert_same(expected(d), lutra_expand(RETAIL / "ottr", native_ottr.prefixes, insts), value=True)
+    assert_same(expected(d), lutra_expand(RETAIL / "ottr", native_ottr.prefixes, insts))
 
 
 @pytest.mark.parametrize("d", DATASETS)
 def test_native_ottr_on_the_python_expander(d, native_ottr):
     insts = generate_instances(native_ottr, DATASETS[d], rows(d))
-    assert_same(expected(d), expand(native_ottr, insts), value=True)
+    assert_same(expected(d), expand(native_ottr, insts))
 
 
 @pytest.mark.parametrize("d", DATASETS)
@@ -232,12 +231,12 @@ def test_composed_tarql_is_checked_in(d, composed):
 @needs_oxigen
 @pytest.mark.parametrize("d", DATASETS)
 def test_composed_tarql_on_oxigen(d, composed, tmp_path):
-    assert_same(expected(d), oxigen(composed[d], csv_path(d), True, tmp_path, exact=True))
+    assert_same(expected(d), oxigen(composed[d], csv_path(d), True, tmp_path))
 
 
 @pytest.mark.parametrize("d", DATASETS)
 def test_composed_tarql_on_the_emulator(d, composed):
-    assert_same(expected(d), run_query(parse_query(composed[d]), rows(d)), value=True)
+    assert_same(expected(d), run_query(parse_query(composed[d]), rows(d)))
 
 
 # ---------------------------------------------------------------------------- TARQL -> OTTR
@@ -262,13 +261,13 @@ def test_decomposed_ottr_lints_clean(decomposed):
 def test_decomposed_ottr_on_lutra(d, decomposed):
     path, lib = decomposed
     insts = generate_instances(lib, QUERY_NS + d, rows(d))
-    assert_same(expected(d), lutra_expand(path, lib.prefixes, insts), value=True)
+    assert_same(expected(d), lutra_expand(path, lib.prefixes, insts))
 
 
 @pytest.mark.parametrize("d", DATASETS)
 def test_decomposed_ottr_on_the_python_expander(d, decomposed):
     _, lib = decomposed
-    assert_same(expected(d), expand(lib, generate_instances(lib, QUERY_NS + d, rows(d))), value=True)
+    assert_same(expected(d), expand(lib, generate_instances(lib, QUERY_NS + d, rows(d))))
 
 
 # ---------------------------------------------------------------------------- round trips
@@ -288,7 +287,7 @@ def test_tarql_round_trip_gives_back_the_query(d, decomposed):
 @pytest.mark.parametrize("d", DATASETS)
 def test_tarql_round_trip_on_oxigen(d, decomposed, tmp_path):
     back = serialize_query(compose(decomposed[1], QUERY_NS + d).query)
-    assert_same(expected(d), oxigen(back, csv_path(d), True, tmp_path, exact=True))
+    assert_same(expected(d), oxigen(back, csv_path(d), True, tmp_path))
 
 
 def test_ottr_round_trip_is_checked_in(ottr_round_trip):
@@ -301,7 +300,7 @@ def test_ottr_round_trip_expands_the_same(d, ottr_round_trip):
     path, lib = ottr_round_trip
     insts = generate_instances(lib, QUERY_NS + d, rows(d))
     g = lutra_expand(path, lib.prefixes, insts) if lutra_available() else expand(lib, insts)
-    assert_same(expected(d), g, value=True)
+    assert_same(expected(d), g)
 
 
 # ---------------------------------------------------------------------------- comparing the forms

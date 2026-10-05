@@ -89,32 +89,28 @@ way: `rt:Price`'s currency is `!`, so every parameter that feeds it must be `!` 
 
 ## 1. Same output on every route
 
-Every route produces the reference graph (105, 108 and 111 triples).
+Every route produces the reference graph (105, 108 and 111 triples), **term for term**:
 
-| Route | Runs on | Compared |
-|---|---|---|
-| native TARQL | oxi-gen (the reference), rdflib emulator | — / by value |
-| native OTTR → instances | Lutra, built-in expander | by value |
-| TARQL from OTTR (`compose`) | oxi-gen, emulator | **exact** / by value |
-| OTTR from TARQL (`decompose`) → instances | Lutra, built-in expander | by value |
-| TARQL → OTTR → TARQL | oxi-gen | **exact** |
-| OTTR → TARQL → OTTR → instances | Lutra | by value |
+| Route | Runs on |
+|---|---|
+| native TARQL | oxi-gen (the reference), rdflib emulator |
+| native OTTR → instances | Lutra, built-in expander |
+| TARQL from OTTR (`compose`) | oxi-gen, emulator |
+| OTTR from TARQL (`decompose`) → instances | Lutra, built-in expander |
+| TARQL → OTTR → TARQL | oxi-gen |
+| OTTR → TARQL → OTTR → instances | Lutra |
 
-"Exact" means the same RDF terms, lexical forms included. The reference file holds oxi-gen's
-output as written, and the tests read it without rdflib's literal normalisation.
+"Term for term" includes lexical forms. The reference file holds oxi-gen's output as written,
+and the tests read it without rdflib's literal normalisation.
 
-"By value" is needed for two lexical differences. Neither changes a value:
-
-* **Decimals.** oxi-gen writes valid decimals in canonical form, from casts and from
-  `STRDT` alike: `"129.90"` becomes `"129.9"`, `"250000.00"` becomes `"250000"`, and
-  `"5.0"` becomes `"5"`. Lutra keeps the form it is given.
-* **UTC date-times.** `ottr-tarql instances` and the emulator evaluate with rdflib, which
-  rewrites `"…T08:00:00Z"` as `"…T08:00:00+00:00"` and `".25Z"` as `".250000+00:00"`.
-  oxi-gen keeps `Z`.
-
-Booleans happen to agree: rdflib and oxi-gen both write `1` as `true`. Anything that
-compares terms will see the two differences, for example `sameTerm`, a join with data
-loaded elsewhere, or a graph diff.
+That needed one fix. oxi-gen writes each typed value an expression produces in canonical
+form, from casts and from `STRDT` alike: `"129.90"` becomes `"129.9"^^xsd:decimal`, `"1"`
+becomes `true`, and `"…+00:00"` becomes `"…Z"`. Lutra keeps whatever form it is given. So
+`ottr-tarql instances`, and the emulator, now write values the way oxi-gen does
+(`ottr_tarql/literals.py`, checked against oxi-gen cell by cell in `tests/test_oxigen.py`).
+Before that, the OTTR routes differed from oxi-gen in every non-canonical decimal and every UTC
+date-time. Those are the same values, but different RDF terms, so `sameTerm`, a join with data
+loaded elsewhere, or a graph diff would all have seen them as different.
 
 ## 2. How the converted mappings compare
 
@@ -209,15 +205,13 @@ text goes through as a string.
 
 ## 4. Issues found
 
-These are left as they are. Each is checked by a test or noted in one.
-
-| Where | Issue | Suggested change |
+| Where | Issue | Status |
 |---|---|---|
-| emulator (`run`), `instances` | Lexical forms follow rdflib, not oxi-gen. Decimals keep the cell's form (oxi-gen: `129.90` becomes `129.9`). Date-times are rewritten (`Z` becomes `+00:00`, `.25` becomes `.250000`), which oxi-gen does not do. So the instances given to Lutra do not carry the cell's text. | Evaluate with `rdflib.NORMALIZE_LITERALS` off, then canonicalise as oxi-gen does where that matters. The tests compare by value. |
-| emulator | rdflib's `xsd:dateTime("2019-03-01")` gives `2019-03-01T00:00:00`, and oxi-gen gives an error, so the graphs differ. | Register strict XSD cast functions. Pinned by `test_emulator_datetime_cast_matches_oxigen` (an expected failure). |
-| `decompose` | A BIND is typed by its outermost function, so `COALESCE(tarql:expandPrefixedName(…), IRI(…))` and `IF(…)` get no type. | Use the type that every branch agrees on. |
-| `decompose` | After `compose`, guards come back as predicate parameters. | Recognise `IF(sameTerm(…), const, ?_unbound)` guards and turn them back into a constant predicate plus a mandatory parameter. |
-| `decompose` | `tpl:Product`'s subject parameter is named `?catalogItem`, because two different item orders are used for naming. | Name the template and its subject from the same class. |
-| CLI | Writing non-ASCII to a Windows console fails (`'charmap' codec can't encode character`), for example `ottr-tarql run` on these CSVs without `-o`. | Write UTF-8 to `sys.stdout.buffer`. |
-| stOTTR parser | Accepts multi-line `/* … */` comments, which Lutra rejects. The library uses `#` comments. | Reject them too, or warn. |
-| oxi-gen | `xsd:date(…)` panics (`UnsupportedCustomFunction`) instead of reporting an error. | Upstream. |
+| emulator (`run`), `instances` | Lexical forms followed rdflib, not oxi-gen. Decimals kept the cell's form, where oxi-gen writes `129.90` as `129.9`. Date-times were rewritten (`Z` as `+00:00`), which oxi-gen does not do. | Fixed (#4): values take oxi-gen's forms, and every route now matches term for term. |
+| emulator | rdflib's `xsd:dateTime("2019-03-01")` gave `2019-03-01T00:00:00` where oxi-gen gives an error, so the graphs differed. | Fixed (#4): strict casts during evaluation. |
+| `decompose` | A BIND is typed by its outermost function, so `COALESCE(tarql:expandPrefixedName(…), IRI(…))` and `IF(…)` get no type. | Open |
+| `decompose` | After `compose`, guards come back as predicate parameters. | Open |
+| `decompose` | `tpl:Product`'s subject parameter is named `?catalogItem`, because two different item orders are used for naming. | Open |
+| CLI | Writing non-ASCII to a Windows console fails (`'charmap' codec can't encode character`), for example `ottr-tarql run` on these CSVs without `-o`. | Open |
+| stOTTR parser | Accepts multi-line `/* … */` comments, which Lutra rejects. The library uses `#` comments. | Open |
+| oxi-gen | `xsd:date(…)` panics (`UnsupportedCustomFunction`) instead of reporting an error. | Upstream |
