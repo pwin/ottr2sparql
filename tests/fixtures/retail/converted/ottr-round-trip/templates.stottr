@@ -1,0 +1,236 @@
+# Shared templates decomposed from TARQL queries.
+
+@prefix ottr: <http://ns.ottr.xyz/0.4/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix tpl: <http://example.com/retail/tpl/> .
+@prefix rt: <http://example.com/retail/template#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <https://schema.org/> .
+@prefix ex: <http://example.com/ns#> .
+@prefix cur: <http://example.com/currency/> .
+@prefix cust: <http://example.com/customer/> .
+@prefix prod: <http://example.com/product/> .
+@prefix ord: <http://example.com/order/> .
+@prefix cat: <http://example.com/category/> .
+@prefix country: <http://example.com/country/> .
+@prefix status: <http://example.com/status/> .
+
+tpl:Customer [
+    ottr:IRI ?customer,
+    ? ?type,
+    ? xsd:string ?comment,
+    ? xsd:date ?birthDate,
+    ? xsd:string ?email,
+    ? xsd:gYear ?foundingDate,
+    ? xsd:string ?legalName,
+    ? xsd:string ?name,
+    ? ottr:IRI ?parentOrganization,
+    ? xsd:string ?telephone,
+    ? ?url,
+    !? ottr:IRI ?predicate,
+    ? ottr:IRI ?node,
+    !? ottr:IRI ?predicate2,
+    ? ottr:IRI ?node2
+]
+:: {
+    ottr:Triple(?customer, rdf:type, ex:Customer),
+    ottr:Triple(?customer, rdf:type, ?type),
+    ottr:Triple(?customer, rdfs:comment, ?comment),
+    ottr:Triple(?customer, schema:birthDate, ?birthDate),
+    ottr:Triple(?customer, schema:email, ?email),
+    ottr:Triple(?customer, schema:foundingDate, ?foundingDate),
+    ottr:Triple(?customer, schema:legalName, ?legalName),
+    ottr:Triple(?customer, schema:name, ?name),
+    ottr:Triple(?customer, schema:parentOrganization, ?parentOrganization),
+    ottr:Triple(?customer, schema:telephone, ?telephone),
+    ottr:Triple(?customer, schema:url, ?url),
+    ottr:Triple(?customer, ?predicate, ?node),
+    ottr:Triple(?customer, ?predicate2, ?node2)
+} .
+
+tpl:Parent [
+    ottr:IRI ?subject,
+    ? ottr:IRI ?subOrganization
+]
+:: {
+    ottr:Triple(?subject, schema:subOrganization, ?subOrganization)
+} .
+
+tpl:Node_4 [
+    ottr:IRI ?subject,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    ? xsd:string ?locality,
+    !? ottr:IRI ?predicate3,
+    ? xsd:string ?street,
+    !? ottr:IRI ?predicate4,
+    ? xsd:string ?postcode,
+    !? ottr:IRI ?predicate5,
+    ? ?country_iri
+]
+:: {
+    ottr:Triple(?subject, ?predicate, schema:PostalAddress),
+    ottr:Triple(?subject, ?predicate2, ?locality),
+    ottr:Triple(?subject, ?predicate3, ?street),
+    ottr:Triple(?subject, ?predicate4, ?postcode),
+    ottr:Triple(?subject, ?predicate5, ?country_iri)
+} .
+
+tpl:Node_5 [
+    ottr:IRI ?subject,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    !? ottr:IRI ?predicate3,
+    ? xsd:boolean ?vip_typed,
+    !? ottr:IRI ?predicate4,
+    ? xsd:dateTime ?customer_since_typed,
+    !? ottr:IRI ?predicate5,
+    ? xsd:decimal ?credit_limit_typed
+]
+:: {
+    ottr:Triple(?subject, ?predicate, ex:Account),
+    ottr:Triple(?subject, ?predicate2, "customer account"@en),
+    ottr:Triple(?subject, ?predicate2, "kundekonto"@nb),
+    ottr:Triple(?subject, ?predicate3, ?vip_typed),
+    ottr:Triple(?subject, ?predicate4, ?customer_since_typed),
+    ottr:Triple(?subject, ?predicate5, ?credit_limit_typed)
+} .
+
+tpl:Order [
+    ottr:IRI ?order,
+    ? xsd:string ?channel,
+    ? xsd:string ?giftMessage,
+    ? ?customer,
+    ? xsd:dateTime ?orderDate,
+    ? ?orderStatus,
+    !? ottr:IRI ?predicate,
+    ? ottr:IRI ?node
+]
+:: {
+    ottr:Triple(?order, ex:channel, ?channel),
+    ottr:Triple(?order, ex:giftMessage, ?giftMessage),
+    ottr:Triple(?order, rdf:type, schema:Order),
+    ottr:Triple(?order, schema:customer, ?customer),
+    ottr:Triple(?order, schema:orderDate, ?orderDate),
+    ottr:Triple(?order, schema:orderStatus, ?orderStatus),
+    ottr:Triple(?order, ?predicate, ?node)
+} .
+
+tpl:Node_6 [
+    ottr:IRI ?subject,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    ? ottr:IRI ?node,
+    !? ottr:IRI ?predicate3,
+    ? ottr:IRI ?node2,
+    !? ottr:IRI ?predicate4,
+    ? xsd:decimal ?discount_pct_typed,
+    !? ottr:IRI ?predicate5,
+    ? xsd:integer ?line_typed,
+    !? ottr:IRI ?predicate6,
+    ? xsd:integer ?qty_typed,
+    !? ottr:IRI ?predicate7,
+    ? xsd:integer ?ROWNUM,
+    !? ottr:IRI ?predicate8,
+    ? ?product_iri
+]
+:: {
+    ottr:Triple(?subject, ?predicate, schema:OrderItem),
+    ottr:Triple(?subject, ?predicate2, ?node),
+    ottr:Triple(?subject, ?predicate3, ?node2),
+    ottr:Triple(?subject, ?predicate4, ?discount_pct_typed),
+    ottr:Triple(?subject, ?predicate5, ?line_typed),
+    ottr:Triple(?subject, ?predicate6, ?qty_typed),
+    ottr:Triple(?subject, ?predicate7, ?ROWNUM),
+    ottr:Triple(?subject, ?predicate8, ?product_iri)
+} .
+
+tpl:Node [
+    ottr:IRI ?subject,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    ? xsd:decimal ?unit_price_typed,
+    !? ottr:IRI ?predicate3,
+    ? ?currency_iri_d10
+]
+:: {
+    ottr:Triple(?subject, ?predicate, schema:PriceSpecification),
+    ottr:Triple(?subject, ?predicate2, ?unit_price_typed),
+    ottr:Triple(?subject, ?predicate3, ?currency_iri_d10)
+} .
+
+tpl:Node_3 [
+    ottr:IRI ?subject,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    ? xsd:date ?shipped_on_typed,
+    !? ottr:IRI ?predicate3,
+    ? xsd:string ?carrier,
+    !? ottr:IRI ?predicate4,
+    ? xsd:string ?tracking
+]
+:: {
+    ottr:Triple(?subject, ?predicate, ex:Shipment),
+    ottr:Triple(?subject, ?predicate2, ?shipped_on_typed),
+    ottr:Triple(?subject, ?predicate3, ?carrier),
+    ottr:Triple(?subject, ?predicate4, ?tracking)
+} .
+
+tpl:Product [
+    ottr:IRI ?catalogItem,
+    ? xsd:date ?discontinuedOn,
+    ? xsd:boolean ?inStock,
+    ? xsd:decimal ?rating,
+    ? ottr:IRI ?replaces,
+    ? xsd:integer ?stockLevel,
+    ? ?type,
+    ? xsd:string ?description,
+    ? ?manufacturer,
+    ? xsd:string ?name,
+    ? xsd:date ?releaseDate,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    ? ottr:IRI ?node,
+    !? ottr:IRI ?predicate3,
+    ? ottr:IRI ?node2
+]
+:: {
+    ottr:Triple(?catalogItem, ex:discontinuedOn, ?discontinuedOn),
+    ottr:Triple(?catalogItem, ex:inStock, ?inStock),
+    ottr:Triple(?catalogItem, ex:rating, ?rating),
+    ottr:Triple(?catalogItem, ex:replaces, ?replaces),
+    ottr:Triple(?catalogItem, ex:stockLevel, ?stockLevel),
+    ottr:Triple(?catalogItem, rdf:type, ex:CatalogItem),
+    ottr:Triple(?catalogItem, rdf:type, schema:Product),
+    ottr:Triple(?catalogItem, rdf:type, ?type),
+    ottr:Triple(?catalogItem, schema:description, ?description),
+    ottr:Triple(?catalogItem, schema:manufacturer, ?manufacturer),
+    ottr:Triple(?catalogItem, schema:name, ?name),
+    ottr:Triple(?catalogItem, schema:releaseDate, ?releaseDate),
+    ottr:Triple(?catalogItem, ?predicate, ex:DiscontinuedProduct),
+    ottr:Triple(?catalogItem, ?predicate2, ?node),
+    ottr:Triple(?catalogItem, ?predicate3, ?node2)
+} .
+
+tpl:Node_2 [
+    ottr:IRI ?subject,
+    !? ottr:IRI ?predicate,
+    !? ottr:IRI ?predicate2,
+    !? ottr:IRI ?predicate3,
+    ? xsd:decimal ?weight_kg_typed
+]
+:: {
+    ottr:Triple(?subject, ?predicate, schema:QuantitativeValue),
+    ottr:Triple(?subject, ?predicate2, "KGM"),
+    ottr:Triple(?subject, ?predicate3, ?weight_kg_typed)
+} .
+
+tpl:Replaces [
+    ottr:IRI ?subject,
+    ? ottr:IRI ?replacedBy
+]
+:: {
+    ottr:Triple(?subject, ex:replacedBy, ?replacedBy)
+} .

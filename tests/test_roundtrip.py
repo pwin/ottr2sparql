@@ -11,9 +11,8 @@ from pathlib import Path
 
 import pytest
 import rdflib
-from rdflib.compare import isomorphic, to_isomorphic, graph_diff
 
-from conftest import CASES, EXAMPLE, FIX, lutra_expand, needs_lutra
+from conftest import CASES, EXAMPLE, FIX, assert_same, lutra_expand, needs_lutra
 from ottr_tarql import Library, compose, decompose, parse_query, parse_stottr
 from ottr_tarql.cli import load_library
 from ottr_tarql.runner import expand, generate_instances, read_csv, run_query
@@ -32,17 +31,6 @@ def decomposed(tmp_path_factory):
     queries = [parse_query((FIX / c).read_text(encoding="utf8"), Path(c).stem) for c in CASES]
     decompose(queries).write(out)
     return out, load_library([str(out)])
-
-
-def assert_same(expected: rdflib.Graph, actual: rdflib.Graph):
-    if not isomorphic(expected, actual):
-        _, only_e, only_a = graph_diff(to_isomorphic(expected), to_isomorphic(actual))
-        pytest.fail(
-            "graphs differ\nonly expected:\n"
-            + only_e.serialize(format="nt")
-            + "\nonly actual:\n"
-            + only_a.serialize(format="nt")
-        )
 
 
 @pytest.mark.parametrize("case", list(CASES))

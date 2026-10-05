@@ -62,6 +62,12 @@ skipped.
 Set `OXI_GEN` to an oxi-gen binary (or put `oxi_gen` on the `PATH`) to also run the queries through the real oxi-gen:
 `run` (the rdflib emulation of oxi-gen) and every composed query are then checked against it.
 
+`tests/test_retail.py` is a larger experiment on three complex CSV files. The same transformation is written by
+hand twice, as TARQL for oxi-gen and as a modular OTTR library that mixes untyped and strongly typed templates.
+Each is converted into the other form, and every route is checked against oxi-gen's output. The results,
+including how the converted mappings differ from the hand-written ones, are in
+[docs/COMPARISON.md](docs/COMPARISON.md).
+
 The fixtures in `tests/fixtures/oxigen` come from [semanticarts/oxi-gen](https://github.com/semanticarts/oxi-gen)
 (Apache-2.0; see `tests/fixtures/oxigen/LICENSE`).
 

@@ -1,0 +1,67 @@
+# Generated from OTTR template <http://example.com/retail/template#ProductRow>.
+# CSV columns: sku, name, description, category, price, currency, weight_kg, in_stock, stock_qty, released, discontinued, supplier, replaces, rating
+PREFIX rt: <http://example.com/retail/template#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX schema: <https://schema.org/>
+PREFIX ex: <http://example.com/ns#>
+PREFIX cur: <http://example.com/currency/>
+PREFIX cust: <http://example.com/customer/>
+PREFIX prod: <http://example.com/product/>
+PREFIX ord: <http://example.com/order/>
+PREFIX cat: <http://example.com/category/>
+PREFIX country: <http://example.com/country/>
+PREFIX status: <http://example.com/status/>
+
+CONSTRUCT {
+  ?sku_iri
+      a schema:Product, ex:CatalogItem, ?category_iri ;
+      schema:name ?name ;
+      schema:description ?description ;
+      ex:inStock ?in_stock_typed ;
+      ex:stockLevel ?stock_qty_typed ;
+      schema:releaseDate ?released_typed ;
+      ex:rating ?rating_typed ;
+      ?_g3 _:b1 ;
+      ?_g8 _:b7 ;
+      ?_g12 ex:DiscontinuedProduct ;
+      ex:discontinuedOn ?discontinued_typed ;
+      schema:manufacturer ?supplier_iri ;
+      ex:replaces ?replaces_iri .
+  _:b1
+      ?_g4 schema:PriceSpecification ;
+      ?_g5 ?price_typed ;
+      ?_g6 ?currency_iri_d2 .
+  _:b7
+      ?_g9 schema:QuantitativeValue ;
+      ?_g10 ?weight_kg_typed ;
+      ?_g11 "KGM" .
+  ?replaces_iri
+      ex:replacedBy ?sku_iri .
+}
+WHERE {
+  BIND(IF(CONTAINS(STR(?sku), "://"), IRI(?sku), tarql:expandPrefixedName(?sku)) AS ?sku_iri)
+  BIND(IF(CONTAINS(STR(?category), "://"), IRI(?category), tarql:expandPrefixedName(?category)) AS ?category_iri)
+  BIND(STRDT(?price, xsd:decimal) AS ?price_typed)
+  BIND(IF(CONTAINS(STR(?currency), "://"), IRI(?currency), tarql:expandPrefixedName(?currency)) AS ?currency_iri)
+  BIND(STRDT(?weight_kg, xsd:decimal) AS ?weight_kg_typed)
+  BIND(STRDT(?in_stock, xsd:boolean) AS ?in_stock_typed)
+  BIND(STRDT(?stock_qty, xsd:integer) AS ?stock_qty_typed)
+  BIND(STRDT(?released, xsd:date) AS ?released_typed)
+  BIND(STRDT(?discontinued, xsd:date) AS ?discontinued_typed)
+  BIND(IF(CONTAINS(STR(?supplier), "://"), IRI(?supplier), tarql:expandPrefixedName(?supplier)) AS ?supplier_iri)
+  BIND(IF(CONTAINS(STR(?replaces), "://"), IRI(?replaces), tarql:expandPrefixedName(?replaces)) AS ?replaces_iri)
+  BIND(STRDT(?rating, xsd:decimal) AS ?rating_typed)
+  BIND(COALESCE(?currency_iri, cur:EUR) AS ?currency_iri_d2)
+  BIND(IF(sameTerm(?price_typed, ?price_typed), schema:priceSpecification, ?_unbound) AS ?_g3)
+  BIND(IF(sameTerm(?price_typed, ?price_typed) && sameTerm(?sku_iri, ?sku_iri), rdf:type, ?_unbound) AS ?_g4)
+  BIND(IF(sameTerm(?sku_iri, ?sku_iri), schema:price, ?_unbound) AS ?_g5)
+  BIND(IF(sameTerm(?price_typed, ?price_typed) && sameTerm(?sku_iri, ?sku_iri), schema:priceCurrency, ?_unbound) AS ?_g6)
+  BIND(IF(sameTerm(?weight_kg_typed, ?weight_kg_typed), schema:weight, ?_unbound) AS ?_g8)
+  BIND(IF(sameTerm(?sku_iri, ?sku_iri) && sameTerm(?weight_kg_typed, ?weight_kg_typed), rdf:type, ?_unbound) AS ?_g9)
+  BIND(IF(sameTerm(?sku_iri, ?sku_iri), schema:value, ?_unbound) AS ?_g10)
+  BIND(IF(sameTerm(?sku_iri, ?sku_iri) && sameTerm(?weight_kg_typed, ?weight_kg_typed), schema:unitCode, ?_unbound) AS ?_g11)
+  BIND(IF(sameTerm(?discontinued_typed, ?discontinued_typed), rdf:type, ?_unbound) AS ?_g12)
+}

@@ -182,6 +182,10 @@ literal form, predicate variables, FILTERs and oxi-gen's `BOUND` behaviour):
 
 `tests/test_oxigen.py` runs the same queries through the real oxi-gen binary when `OXI_GEN` points
 to one. It checks that the emulation and every composed query agree with oxi-gen.
+`tests/test_retail.py` takes three complex CSV files with hand-written TARQL and hand-written
+OTTR for the same transformation. It checks every conversion and round trip against oxi-gen's
+output, and measures how the converted forms differ from the hand-written ones (see
+[COMPARISON.md](COMPARISON.md)).
 `tests/test_shapes.py` checks that the generated shapes (§5) accept the output for every fixture and
 reject deliberately broken data. It uses SHACL_Engine (`pip install shacl`).
 
